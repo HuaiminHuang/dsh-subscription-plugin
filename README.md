@@ -15,6 +15,8 @@
 
 [实施计划](docs/IMPLEMENTATION_PLAN.md)列出架构选择、登录与模型调用流程、额度来源的待验证点、分阶段交付及验收标准。在完成其中的验证关口之前，不承诺单次授权可同时驱动模型请求、额度读取和 reset 卡操作。
 
+开发时先读 [AGENTS.md](AGENTS.md)；与设置页、异步测试和演示录制有关的上游技能副本集中在 [`.agents/`](.agents/README.md)。这些是开发参考，不能代替对目标 DSH 版本的实测。
+
 ## 参考
 
 - [DSH `LlmAdapter` 与模型目录](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/llm/llm/src/index.ts)

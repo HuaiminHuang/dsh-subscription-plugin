@@ -6,3 +6,5 @@ coverage/
 .env.*
 !.env.example
 *.tsbuildinfo
+.playwright-mcp/
+__pycache__/
