@@ -35,6 +35,9 @@ function controller(overrides: Record<string, unknown> = {}): CodexSubscriptionC
     revision: 0,
     state: { status: 'checking', models: [] },
     listeners: new Set(),
+    refreshEpoch: 0,
+    pendingRefreshes: new Set(),
+    disposed: false,
     ...overrides,
   })
   return instance
@@ -183,5 +186,97 @@ describe('CodexSubscriptionController authorization lifecycle', () => {
     expect(instance.getState()).toMatchObject({ status: 'error', error: 'saved-login-unavailable', models: [] })
     expect(withdrewRoute).toBe(1)
     expect(deleted).toBe(0)
+  })
+
+  it('waits for a pending credential refresh before sign-out and cannot restore the route afterwards', async () => {
+    const available = deferred<{ id: string; name: string }[]>()
+    const readStarted = deferred<void>()
+    let deleted = 0
+    const routes: string[][] = []
+    const registration = Object.assign(() => {}, { replace: (ids: string[]) => { routes.push(ids) } })
+    const instance = controller({
+      ctx: {
+        authorization: { cancel: () => {} },
+        credentials: { deleteRecord: async () => { deleted++ } },
+        llm: { registerAdapter: () => registration },
+      },
+      models: { getAvailable: () => { readStarted.resolve(); return available.promise } },
+      registration,
+      state: { status: 'signed-in', models: [{ id: 'gpt-5.6-terra', name: 'Test model' }] },
+    })
+    const refresh = (instance as unknown as { refreshLoginState(): Promise<void> }).refreshLoginState()
+    await readStarted.promise
+    const signOut = instance.signOut()
+    expect(deleted).toBe(0)
+    available.resolve([{ id: 'gpt-5.6-terra', name: 'Test model' }])
+    await refresh
+    await signOut
+    expect(deleted).toBe(1)
+    expect(instance.getState()).toMatchObject({ status: 'signed-out', models: [] })
+    expect(routes).toEqual([[]])
+  })
+
+  it('waits for an owned provider login even if the authorization surface has already settled', async () => {
+    const started = deferred<void>()
+    const finished = deferred<void>()
+    let deleted = 0
+    let flow!: AuthorizationFlow
+    const instance = controller({
+      ctx: {
+        authorization: { registerFlow: (registered: AuthorizationFlow) => { flow = registered; return () => {} }, cancel: () => {} },
+        credentials: { deleteRecord: async () => { deleted++ } },
+      },
+      models: { login: async () => { started.resolve(); await finished.promise } },
+    })
+    ;(instance as unknown as { registerFlow(): () => void }).registerFlow()
+    const run = flow.run({ method: 'browser', signal: new AbortController().signal,
+      notify: () => {}, prompt: async () => { throw new Error('unexpected prompt') }, commit: async () => {} })
+    await started.promise
+    const signOut = instance.signOut()
+    expect(deleted).toBe(0)
+    expect(() => instance.beginLogin('browser')).toThrow('Codex login is not ready')
+    finished.resolve()
+    await run
+    await signOut
+    expect(deleted).toBe(1)
+    expect(instance.getState().status).toBe('signed-out')
+  })
+
+  it('waits for a pending state read on unload and ignores its late completion', async () => {
+    const available = deferred<{ id: string; name: string }[]>()
+    const started = deferred<void>()
+    let withdrawn = 0
+    let routeChanges = 0
+    const instance = controller({
+      ctx: { authorization: { cancel: () => {} } },
+      models: { getAvailable: () => { started.resolve(); return available.promise } },
+      registration: Object.assign(() => { withdrawn++ }, { replace: () => { routeChanges++ } }),
+    })
+    const refresh = (instance as unknown as { refreshLoginState(): Promise<void> }).refreshLoginState()
+    await started.promise
+    const dispose = (instance as unknown as { dispose(): Promise<void> }).dispose()
+    expect(withdrawn).toBe(1)
+    available.resolve([{ id: 'gpt-5.6-terra', name: 'Test model' }])
+    await Promise.all([refresh, dispose])
+    expect(instance.getState().status).toBe('checking')
+    expect(routeChanges).toBe(0)
+  })
+
+  it('aborts and joins a running model request before deleting its grant', async () => {
+    let deleted = 0
+    const instance = controller({
+      ctx: {
+        authorization: { cancel: () => {} },
+        credentials: { deleteRecord: async () => { deleted++ } },
+      },
+    })
+    const request = instance.openRequest(undefined)
+    const signOut = instance.signOut()
+    expect(request.signal.aborted).toBe(true)
+    expect(deleted).toBe(0)
+    expect(() => instance.openRequest(undefined)).toThrow('Codex plugin is not accepting requests')
+    request[Symbol.dispose]()
+    await signOut
+    expect(deleted).toBe(1)
   })
 })

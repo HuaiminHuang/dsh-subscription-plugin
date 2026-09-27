@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { dirname, relative, resolve } from 'node:path'
 import { defineConfig } from 'tsdown'
 import { transform } from 'lightningcss'
 import { typertPlugin } from '@deepseek-ai/dsh-typert-generator/tsdown'
@@ -13,11 +13,12 @@ const clientCssPlugin = {
   name: 'dsh-openai-subscription-css-modules',
   resolveId(source: string, importer: string | undefined) {
     if (!source.endsWith('.module.css') || importer === undefined) return null
-    return CSS_PREFIX + resolve(dirname(importer), source) + '.mjs'
+    const file = resolve(dirname(importer), source)
+    return CSS_PREFIX + relative(process.cwd(), file).replaceAll('\\', '/') + '.mjs'
   },
   async load(this: { addWatchFile(file: string): void }, id: string) {
     if (!id.startsWith(CSS_PREFIX)) return null
-    const file = id.slice(CSS_PREFIX.length, -'.mjs'.length)
+    const file = resolve(process.cwd(), id.slice(CSS_PREFIX.length, -'.mjs'.length))
     this.addWatchFile(file)
     const compiled = transform({ filename: file, code: await readFile(file), cssModules: { pattern: '[hash]_[local]' }, minify: true })
     const classes: Record<string, string> = {}

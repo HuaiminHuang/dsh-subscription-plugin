@@ -1,6 +1,6 @@
 # AGENTS.md — OpenAI Subscription for DSH
 
-This repository builds **one independent, opt-in DSH Bundle**, not a package inside the DSH monorepo. Its npm identity is `@h2mzzz/dsh-openai-subscription`. The current package is private (`0.0.0`) and under development: Web is the only profile recommended for local validation; a real account login, real Loader/profile composition, Desktop, subscription quota, and reset cards are **not** verified or shipped as complete features. Read [README.md](README.md), [the implementation plan](docs/IMPLEMENTATION_PLAN.md), and [the pinned compatibility baseline](docs/COMPATIBILITY_BASELINE.md) before changing behavior.
+This repository builds **one independent, opt-in DSH Bundle**, not a package inside the DSH monorepo. Its npm identity is `@h2mzzz/dsh-openai-subscription`. The current package is private (`0.0.2`) and under development: Web is the only profile recommended for local validation; an isolated Web profile has verified Host Loader mount/unmount, but real account login, full browser Client composition, Desktop, subscription quota, and reset cards are **not** verified or shipped as complete features. Read [README.md](README.md), [the implementation plan](docs/IMPLEMENTATION_PLAN.md), and [the pinned compatibility baseline](docs/COMPATIBILITY_BASELINE.md) before changing behavior.
 
 ## Target and ownership
 

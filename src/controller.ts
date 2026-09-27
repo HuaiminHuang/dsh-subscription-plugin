@@ -19,19 +19,30 @@ interface Attempt {
   timedOut: boolean
 }
 
+interface ActiveRequest {
+  readonly controller: AbortController
+  readonly finished: Promise<void>
+}
+
 /** Host owner for the Codex login lifecycle, route registration, and safe Remote state. */
 export class CodexSubscriptionController extends TypertRemoteService {
   static inject = ['llm', 'credentials', 'authorization']
 
   readonly models: MutableModels
   private readonly adapter: CodexSubscriptionAdapter
-  private readonly activeRequests = new Set<AbortController>()
+  private readonly activeRequests = new Set<ActiveRequest>()
   private registration: AdapterRegistrationHandle | undefined
   private attempt: Attempt | undefined
   private readonly instanceId = randomUUID()
   private state: CodexSubscriptionState = { status: 'checking', models: [], instanceId: this.instanceId, revision: 0 }
   private revision = 0
   private readonly listeners = new Set<() => void>()
+  private readonly pendingRefreshes = new Set<Promise<void>>()
+  private refreshEpoch = 0
+  private disposed = false
+  private loginRun: Promise<unknown> | undefined
+  private loginTask: Promise<void> | undefined
+  private signOutTask: Promise<CodexSubscriptionState> | undefined
 
   constructor(ctx: Context) {
     super(ctx, 'codexSubscription', { namespace: 'codexSubscription' })
@@ -39,18 +50,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
     this.models.setProvider(openaiCodexProvider())
     this.adapter = new CodexSubscriptionAdapter(this)
     ctx.effect(() => this.registerFlow())
-    ctx.effect(() => () => {
-      if (this.attempt !== undefined) {
-        clearTimeout(this.attempt.timer)
-        this.attempt.controller.abort()
-        this.attempt = undefined
-      }
-      this.ctx.authorization.cancel(CODEX_CREDENTIAL_KEY)
-      this.registration?.()
-      this.registration = undefined
-      for (const request of this.activeRequests) request.abort('Codex subscription plugin unloaded')
-      this.listeners.clear()
-    })
+    ctx.effect(() => () => this.dispose())
     void this.refreshLoginState()
   }
 
@@ -61,16 +61,23 @@ export class CodexSubscriptionController extends TypertRemoteService {
 
   /** Link an adapter request to the plugin lifetime and an optional caller cancellation signal. */
   openRequest(signal: AbortSignal | undefined): Disposable & { readonly signal: AbortSignal } {
+    if (this.disposed || this.signOutTask !== undefined) {
+      throw new LlmError('Codex plugin is not accepting requests', 'NO_ADAPTER')
+    }
     const controller = new AbortController()
     const abort = (): void => controller.abort(signal?.reason)
     signal?.addEventListener('abort', abort, { once: true })
-    this.activeRequests.add(controller)
+    if (signal?.aborted) abort()
+    let finish!: () => void
+    const request: ActiveRequest = { controller, finished: new Promise<void>(resolve => { finish = resolve }) }
+    this.activeRequests.add(request)
     return {
       signal: controller.signal,
       [Symbol.dispose]: () => {
         signal?.removeEventListener('abort', abort)
         controller.abort('Codex subscription request completed')
-        this.activeRequests.delete(controller)
+        this.activeRequests.delete(request)
+        finish()
       },
     }
   }
@@ -85,6 +92,10 @@ export class CodexSubscriptionController extends TypertRemoteService {
     if (method !== 'browser' && method !== 'device_code') {
       throw new LlmError('Unknown Codex sign-in method', 'INVALID_AUTHORIZATION_METHOD')
     }
+    if (this.disposed || this.signOutTask !== undefined || this.pendingRefreshes.size !== 0
+      || this.loginRun !== undefined) {
+      throw new LlmError('Codex login is not ready', 'INVALID_AUTHORIZATION_METHOD')
+    }
     if (this.attempt !== undefined) return this.state
     const controller = new AbortController()
     const attempt: Attempt = {
@@ -97,7 +108,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
     attempt.timer.unref()
     this.attempt = attempt
     this.publish({ status: 'signing-in', attemptId: attempt.id, method, models: [] })
-    void this.ctx.authorization.begin({
+    const task = this.ctx.authorization.begin({
       key: CODEX_CREDENTIAL_KEY,
       method,
       signal: controller.signal,
@@ -127,7 +138,15 @@ export class CodexSubscriptionController extends TypertRemoteService {
           error: attempt.timedOut ? 'login-timeout' : 'login-failed',
         })
       },
-    )
+    ).catch(() => {
+      // A failed state projection must not leave a detached Host rejection.
+      if (this.attempt !== attempt || this.disposed) return
+      this.attempt = undefined
+      this.publish({ status: 'error', error: 'login-failed', models: [], checkedAt: new Date().toISOString() })
+    }).finally(() => {
+      if (this.loginTask === task) this.loginTask = undefined
+    })
+    this.loginTask = task
     return this.state
   }
 
@@ -143,14 +162,30 @@ export class CodexSubscriptionController extends TypertRemoteService {
   /** Remove only this plugin's OAuth grant and withdraw its provider route. */
   @Remote
   async signOut(): Promise<CodexSubscriptionState> {
+    if (this.signOutTask !== undefined) return this.signOutTask
+    if (this.disposed) throw new LlmError('Codex plugin is unloaded', 'INVALID_AUTHORIZATION_METHOD')
+    const task = this.finishSignOut()
+    this.signOutTask = task
+    try { return await task } finally { this.signOutTask = undefined }
+  }
+
+  private async finishSignOut(): Promise<CodexSubscriptionState> {
+    this.refreshEpoch++
     if (this.attempt !== undefined) {
       clearTimeout(this.attempt.timer)
       this.attempt.controller.abort()
       this.ctx.authorization.cancel(CODEX_CREDENTIAL_KEY)
       this.attempt = undefined
     }
-    for (const request of this.activeRequests) request.abort('Codex subscription sign-out')
+    for (const request of this.activeRequests) request.controller.abort('Codex subscription sign-out')
+    await Promise.all([...this.activeRequests].map(request => request.finished))
+    // Authorization can answer "cancelled" before an orphaned provider flow
+    // stops. Wait for the owned flow itself before deleting the grant.
+    await Promise.allSettled([this.loginRun, this.loginTask].filter((task): task is Promise<void> => task !== undefined))
+    await Promise.allSettled([...this.pendingRefreshes])
+    if (this.disposed) return this.state
     await this.ctx.credentials.deleteRecord(CODEX_CREDENTIAL_KEY)
+    if (this.disposed) return this.state
     this.registration?.replace([])
     this.publish({ status: 'signed-out', models: [], checkedAt: new Date().toISOString() })
     return this.state
@@ -194,7 +229,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
         { id: 'device_code', label: '设备代码登录' },
       ],
       run: async session => {
-        await this.models.login(PI_PROVIDER_ID, 'oauth', {
+        const running = this.models.login(PI_PROVIDER_ID, 'oauth', {
           signal: session.signal,
           notify: event => session.notify(this.authorizationNotice(event)),
           // pi-ai starts a manual fallback prompt beside its loopback listener.
@@ -211,15 +246,26 @@ export class CodexSubscriptionController extends TypertRemoteService {
             throw new LlmError('Codex credential input must remain on the Host', 'UNSUPPORTED_OPTION')
           },
         })
+        this.loginRun = running
+        try { await running } finally { if (this.loginRun === running) this.loginRun = undefined }
       },
     }
     return this.ctx.authorization.registerFlow(flow)
   }
 
   private async refreshLoginState(): Promise<void> {
+    if (this.disposed || this.signOutTask !== undefined) return
+    const epoch = this.refreshEpoch
+    const task = this.checkLoginState(epoch)
+    this.pendingRefreshes.add(task)
+    try { await task } finally { this.pendingRefreshes.delete(task) }
+  }
+
+  private async checkLoginState(epoch: number): Promise<void> {
     const checkedAt = new Date().toISOString()
     try {
       const models = await this.models.getAvailable(PI_PROVIDER_ID)
+      if (this.disposed || this.signOutTask !== undefined || epoch !== this.refreshEpoch) return
       if (models.length === 0) {
         this.registration?.replace([])
         this.publish({ status: 'signed-out', models: [], checkedAt })
@@ -232,6 +278,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
         models: models.map(model => ({ id: model.id, name: model.name })),
       })
     } catch {
+      if (this.disposed || this.signOutTask !== undefined || epoch !== this.refreshEpoch) return
       this.registration?.replace([])
       this.publish({
         status: 'error', models: [], checkedAt,
@@ -285,8 +332,27 @@ export class CodexSubscriptionController extends TypertRemoteService {
   }
 
   private publish(next: CodexSubscriptionState): void {
+    if (this.disposed) return
     this.revision++
     this.state = Object.freeze({ ...next, instanceId: this.instanceId, revision: this.revision })
     for (const listener of this.listeners) listener()
+  }
+
+  private async dispose(): Promise<void> {
+    this.disposed = true
+    this.refreshEpoch++
+    if (this.attempt !== undefined) {
+      clearTimeout(this.attempt.timer)
+      this.attempt.controller.abort()
+      this.attempt = undefined
+    }
+    this.ctx.authorization.cancel(CODEX_CREDENTIAL_KEY)
+    this.registration?.()
+    this.registration = undefined
+    for (const request of this.activeRequests) request.controller.abort('Codex subscription plugin unloaded')
+    this.listeners.clear()
+    await Promise.allSettled([this.loginRun, this.loginTask, this.signOutTask, ...this.pendingRefreshes,
+      ...[...this.activeRequests].map(request => request.finished)]
+      .filter((task): task is Promise<void> | Promise<CodexSubscriptionState> => task !== undefined))
   }
 }

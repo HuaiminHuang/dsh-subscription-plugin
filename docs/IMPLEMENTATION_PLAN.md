@@ -1,6 +1,6 @@
 # Codex 订阅插件实施计划
 
-**状态：阶段 1 开发中。** 已有独立 Bundle 骨架、Host/Client、pi-ai OAuth 桥接、独立凭据键与 `codex-subscription` 路由；构建包的 Host/Client 清单和 Client 激活已检查，但没有完成真实账号、真实 Loader/profile 组合、Desktop 或额度验证。本文记录拟交付行为和需要实验确认的接口，不是现有功能说明。核查基线为本地 DSH `0.1.7-rc.2` 源码和 2026-09-27 可见的 [Codex App Server 文档](https://developers.openai.com/codex/app-server)；精确提交、依赖版本和本机检出限制见[兼容性基线](COMPATIBILITY_BASELINE.md)。发布前须对实际安装版本重新核查。
+**状态：阶段 1 开发中。** 已有独立 Bundle 骨架、Host/Client、pi-ai OAuth 桥接、独立凭据键与 `codex-subscription` 路由；构建包的 Host/Client 清单、Client 激活与槽位撤销，以及隔离 Web profile 的 Host Loader 装载/卸载已检查，但没有完成真实账号、完整浏览器 Client 组合、Desktop 或额度验证。本文记录拟交付行为和需要实验确认的接口，不是现有功能说明。核查基线为 DSH `0.1.7-rc.2` 源码和 2026-09-27 可见的 [Codex App Server 文档](https://developers.openai.com/codex/app-server)；精确提交、依赖版本和本机检出限制见[兼容性基线](COMPATIBILITY_BASELINE.md)。发布前须对实际安装版本重新核查。
 
 ## 1. 目标与边界
 
@@ -91,7 +91,7 @@ Host → Client 的最小额度视图建议为：`fetchedAt`、可选 `plan`、�
 
 ### 阶段 1：可使用的模型订阅插件
 
-- 交付一个包含 Host 与 Client 的 Bundle，以及设置入口、登录/取消/退出、凭据和独立 Codex `LlmAdapter`。**进行中：** 已完成源码实现、纯转换/凭据单元测试、构建包 Client 激活和 tarball 内容检查；待完成真实 Loader/profile 组合与安装实测。
+- 交付一个包含 Host 与 Client 的 Bundle，以及设置入口、登录/取消/退出、凭据和独立 Codex `LlmAdapter`。**进行中：** 已完成源码实现、纯转换/凭据单元测试、构建包 Client 激活和 tarball 内容检查；隔离 Web profile 已安装构建包并验证 Host Loader 装载/卸载，仍待真实浏览器 Client 组合与账号验证。
 - 通过真实 Loader/profile 组合测试注册和卸载，而非只手工 `ctx.plugin()`；测试登录失败、授权取消、token 刷新、跨进程重新启动、没有 API Key、路由冲突和禁用后的 UI/Remote/路由撤销。
 - 通过一次真实 Codex 对话验证文本、工具调用、续轮、取消和归因；不支持的内容必须明确拒绝。未取得账户或权限时，真实 API 用例明确跳过，不能以 mock 通过宣称真实授权成功。
 

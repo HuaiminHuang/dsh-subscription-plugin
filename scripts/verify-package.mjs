@@ -12,6 +12,9 @@ import { apply as mountGateway, inject as gatewayInject } from '../../deepseek-h
 const packageName = '@h2mzzz/dsh-openai-subscription'
 const metadata = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
+if (readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8').includes(process.cwd())) {
+  throw new Error('Built Client contains a machine-specific source path')
+}
 if (metadata.name !== packageName || hostName !== packageName || TYPERT_REMOTE.package !== packageName
   || !patch.includes(`name: "${packageName}"`)) {
   throw new Error('Bundle metadata, patch, Host, and Remote must use the same scoped package name')
@@ -127,6 +130,15 @@ try {
     await click('browserSignIn')
     if (chosen.join(',') !== 'device_code,browser' || opened.join(',') !== 'about:blank') {
       throw new Error('Browser sign-in did not open a tab and select its method')
+    }
+    await act(async () => { root.render(React.createElement(sections[0].component, {
+      t: key => key, useState: selector => selector({ status: 'signed-in', models: [] }),
+      operations: { signOut: async () => { throw new Error('private Host diagnostic') } },
+    })) })
+    await click('signOut')
+    if (!dom.window.document.body.textContent.includes('operationFailed')
+      || dom.window.document.body.textContent.includes('private Host diagnostic')) {
+      throw new Error('A rejected Host operation must show safe feedback without leaking its error')
     }
   } finally {
     await act(async () => { root.unmount() })

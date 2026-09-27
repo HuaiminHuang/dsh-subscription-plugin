@@ -1,62 +1,89 @@
+---
+description: "独立的 DSH ChatGPT/Codex 订阅登录与模型接入 Bundle。"
+kind: "package-bundle"
+---
+
 # @h2mzzz/dsh-openai-subscription
 
-独立、可选的 DeepSeek Harness (DSH) Bundle：在 DSH 设置窗口增加 **OpenAI** 页面，使用 ChatGPT/Codex 订阅登录，并通过插件自己的模型路由调用 Codex。**社区项目，非 DeepSeek 或 OpenAI 官方插件。**
+简体中文 | [English](README.en.md)
 
-**当前状态：开发中，尚未发布 npm 包，也未用真实账号完成授权、模型调用或额度验证。** 包版本为 `0.0.0` 且标记为 `private`；下述安装方法用于本地构建的包，不是可直接从 npm 仓库下载的发行版。
+独立、可选的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）插件：在原有设置窗口增加 **OpenAI** 页面，通过插件专有的 `codex-subscription` 模型路由调用 Codex。它不是 DeepSeek 或 OpenAI 的官方插件。
 
-## 兼容性与安装
+> **开发中。** 目前在 Ubuntu 上完成类型检查、模拟测试、构建包检查和隔离 Web profile 的 Host 装载/卸载检查；真实 ChatGPT 授权与模型请求、浏览器端完整 UI 组合及 Desktop 客户端均未完成验收。包为 `0.0.2` / `private`，仅作为 GitHub Pre-release 附件提供，尚未发布 npm 包。
 
-- 仅按 [兼容性基线](docs/COMPATIBILITY_BASELINE.md)中的 DSH `0.1.7-rc.2`（提交 `477b4f420553e8a52c2fbccc464d7561b239c443`）、Node 与已打补丁的 `@earendil-works/pi-ai@0.85.1` 开发。需要一个能运行 `dsh` 和 `pnpm` 的 DSH 安装；其他版本没有验证，不建议使用版本豁免强行启用。
-- 本地构建需要与仓库同级的 `../deepseek-harness` 检出，以满足 `package.json` 中的开发依赖链接。这些源码链接**不是**安装到用户 profile 的方式。
-- 当前只建议在 **Web profile** 安装和验证；官方 Desktop 的独立 profile、窗口和系统浏览器授权尚未实测，Headless/TUI 不是此设置页的支持范围。
+## 兼容性
 
-在插件仓库根目录构建并打包：
+| 项目 | 当前范围 |
+| --- | --- |
+| DSH | `0.1.7-rc.2`，提交 `477b4f420553e8a52c2fbccc464d7561b239c443` |
+| pi-ai | DSH 使用的已打补丁 `@earendil-works/pi-ai@0.85.1` |
+| Web profile | 隔离 profile 中的 Host 装载/卸载与构建后 Client 槽位测试；真实授权、模型调用待验证 |
+| Desktop | 复用同一 Web 界面，但需要独立安装到 Desktop profile；尚未实测 |
+
+其他 DSH 版本和平台未验证，不建议使用版本豁免绕过兼容性检查。精确依赖和本机检出条件见[兼容性基线](https://github.com/HuaiminHuang/dsh-subscription-plugin/blob/main/docs/COMPATIBILITY_BASELINE.md)。
+
+## 安装
+
+从 [v0.0.2 Pre-release](https://github.com/HuaiminHuang/dsh-subscription-plugin/releases/tag/v0.0.2) 下载**构建后的 npm `.tgz` 附件**。Web profile 可直接使用该附件 URL：
+
+```sh
+dsh plugin --profile web add https://github.com/HuaiminHuang/dsh-subscription-plugin/releases/download/v0.0.2/h2mzzz-dsh-openai-subscription-0.0.2.tgz
+```
+
+也可从本仓库自行构建：构建依赖需要同级目录中的目标版本 `../deepseek-harness` 检出。在插件仓库根目录运行：
 
 ```sh
 pnpm install --ignore-scripts
-pnpm typecheck
-pnpm test
 pnpm test:package
-npm pack --pack-destination /tmp/opencode
+npm pack
 ```
 
-然后通过 DSH 的 profile 插件命令安装刚生成的 tarball（先核对实际文件名；当前版本的文件名如下）：
+`npm pack` 会生成 `h2mzzz-dsh-openai-subscription-0.0.2.tgz`。安装到 Web profile（把路径换成产物的实际**绝对路径**）：
 
 ```sh
-dsh plugin --profile web add /tmp/opencode/h2mzzz-dsh-openai-subscription-0.0.0.tgz
+dsh plugin --profile web add /absolute/path/to/h2mzzz-dsh-openai-subscription-0.0.2.tgz
 ```
 
-DSH 会根据包内 `dsh.bundle.patch` / `cordis.patch.yml` 把 Host 和 Client 入口加入该 profile；它不是直接启动的 Node 应用。**安装或更新 Bundle 后，由你自行重启 Web profile 并刷新页面**，再在设置窗口的 OpenAI 页面登录；不要把服务端的回调 URL、授权码、令牌或整个授权错误页发给其他人。浏览器登录只适合浏览器与 DSH Host 在同一台机器的情形；设备代码方式存在于依赖实现中，但服务端是否对账号开放仍待实测。
+在受支持版本的 Desktop 中，使用应用内 **「插件」→「添加插件」** 输入上述 `.tgz` 附件 URL 或 Desktop 电脑可访问的本地 `.tgz` 绝对路径，再按界面提示启用；**不要**运行 `dsh plugin --profile desktop` 或手工修改 Desktop profile。Web 和 Desktop 复用 UI，却各自拥有插件依赖与启用列表，Web 安装不会自动同步过去。Desktop 安装与登录流程尚待实测。仓库源码 ZIP 和 Git 地址没有安装所需的 `lib/`，不能直接当成可用插件包。
 
-已安装旧的无 scope 包 `dsh-openai-subscription` 时，先在**停用该 profile 的维护窗口**执行 `dsh plugin --profile web remove dsh-openai-subscription`，再添加上述新包并由你自行重启。不要让新旧包同时加载：它们共享路由与凭据键。改名**不会**迁移或删除已有插件凭据；但真实的跨包升级、重启恢复仍待验证。本文不要求自动退出登录，也不修改你正在运行的 Web 服务。
+旧的无 scope 包 `dsh-openai-subscription` 和新包不能在**同一 profile** 同时启用：它们占用相同的路由和历史凭据键。迁移时应在维护窗口移除旧包、安装新包，并按 DSH 的提示由用户自行重启；停用或移除 Bundle 不会自动注销插件的账户。
 
-### 默认模型
+## 使用
 
-插件提供模型路由 `codex-subscription`，不全局修改 DSH 的 `agent-default-model`。若希望该 Web profile 的新会话默认使用 `gpt-5.6-terra`、Medium 思考强度，可在该 profile 的 `cordis.patch.yml` 里为**现有** `agent-default-model` 条目设置（与其他条目合并，不要替换整个文件）：
+1. 打开 DSH 设置窗口的 **OpenAI** 页面，点击「登录」，选择浏览器登录或设备代码登录。浏览器登录需要浏览器与 DSH Host 在同一台电脑上；设备代码方式是否被服务端接受尚未用真实账号验证。回调页显示完成不等于令牌已经成功写入，以插件实际状态为准。
+2. 登录成功后从 DSH 模型选择器选择 `codex-subscription` 路由下的型号及思考强度。模型列表来自锁定的 pi-ai **静态目录**，列出一个 ID 不代表账号已获服务端调用权限。当前目录含 `gpt-5.6-terra`，不含 `gpt-6-sol`、`gpt-6-luna`。
+3. 如需让某个 Web profile 的**新会话**默认使用 `gpt-5.6-terra` / Medium，在该 profile 自己的 `cordis.patch.yml` 中配置现有的 `agent-default-model` 条目；本插件不会覆盖其他 profile 或已有会话的选择：
 
-```yml
-- id: agent-default-model
-  name: "@deepseek-ai/dsh-agent-default-model"
-  config:
-    provider: codex-subscription
-    model: gpt-5.6-terra
-    reasoningEffort: medium
-```
+   ```yml
+   - id: agent-default-model
+     name: "@deepseek-ai/dsh-agent-default-model"
+     config:
+       provider: codex-subscription
+       model: gpt-5.6-terra
+       reasoningEffort: medium
+   ```
 
-本机 Web profile 已使用这三个值；包本身不会覆盖其他用户的 profile 或已有会话的模型选择。模型必须在登录后出现在目录中才可选；是否有服务端使用权限仍以真实请求为准。插件对其当前支持 Medium 的 Codex 型号也报告 Medium 为**思考强度默认值**，明确选择其他强度时以选择值为准。
+支持 Medium 的 Codex 型号在插件元数据中也默认 Medium；明确选择其他受支持档位时，以该选择为准。思考档位的映射和透传只有模拟测试证据，尚待真实调用确认。Desktop 的 Electron 窗口会拦截浏览器登录预开的空白标签；授权链接出现后可尝试页面上的「打开登录页面」交给系统浏览器，这条桌面流程也尚未验收。
 
-## 功能与边界
+## Bundle 结构
 
-- **独立身份：** npm 包名是 `@h2mzzz/dsh-openai-subscription`（npm 不接受含大写字母的 `@H2MZZZ` 作为新包 scope）；展示名是 OpenAI，但 DSH 路由 ID 仍为 `codex-subscription`，不会占用官方的 `openai` / `openai-codex` 路由。凭据作用域仍为 `dsh-openai-subscription`、记录 ID 为 `codex`，改名不改变已有记录或其他插件的凭据。
-- **授权：** 设置页的「登录」展开浏览器登录和设备代码登录；Host 持有 OAuth state、授权回调、令牌、轮换与凭据写入。浏览器点击时打开新标签；loopback 页面显示“完成”只表示回调已收到，**不**证明凭据已经保存或模型可用。登录状态由 Host 自动同步；取消与退出仅作用于本插件的授权尝试/凭据。设备代码以及远程浏览器后备流程尚未用真实账号验证，不保证可用。
-- **模型：** 列表是锁定的 pi-ai `openai-codex` **静态目录**，并非实时抓取账号的可用型号。当前目录有 `gpt-5.6-terra`、`gpt-5.6-sol`、`gpt-5.6-luna`、`gpt-6-astra` 等；**没有** `gpt-6-sol` 和 `gpt-6-luna`。目前只能确定依赖目录缺少它们，不能断言是因为“太新”或账号权限，也不会凭空添加未核实的型号。
-- **思考强度：** 通过 DSH 原有模型选择器显示各型号实际可发送的 Low、Medium、High、Extra high，明确支持时再显示 Max。当前目录的 Minimal 映射到 Low，故不重复提供；“关闭”仅省略参数，不能保证关闭服务端默认，因此不展示。不支持的档位直接拒绝而不静默改档。此处仅有模拟请求验证，真实响应尚未确认。
-- **请求范围：** 首版支持文本和常规工具调用；图像、deferred tools 与 stop sequences 不提供有效支持，不应假设它们可用。插件不以 `OPENAI_API_KEY` 或其他插件/Codex CLI 的登录做后备。
-- **额度：** 订阅窗口、重置时间和 reset 卡尚未实现；一次请求的 token 用量**不是**订阅额度。没有服务端数值就不能显示为零，也没有消耗 reset 卡的功能。
-- **停用与退出：** 移除 Bundle 不等于退出登录；设置页「退出登录」才会删除本插件自己的记录。不要把凭据、完整 callback URL 或真实授权响应写入仓库、日志、截图或问题报告。
+| 文件 | 职责 |
+| --- | --- |
+| `package.json`、`cordis.patch.yml` | 声明 `dsh.bundle.patch`、Web Client 入口与单个可选 Loader 行 |
+| `src/index.ts`、`src/controller.ts` | Host 插件与授权、凭据状态、模型路由的生命周期 |
+| `src/credential-store.ts`、`src/adapter.ts` | 插件专有 OAuth 记录与 DSH `LlmAdapter` 的 Codex 请求转换 |
+| `src/typert.host.ts`、`src/remote.ts` | Host/Client 间的插件专有、受校验 Remote 清单 |
+| `src/client/` | `settings.section` 页面、中英文 locale 与样式；不持有令牌 |
 
-## 开发与验证状态
+对外展示名是 OpenAI，但 provider ID 保留为 `codex-subscription`；凭据作用域保留历史值 `dsh-openai-subscription/codex`。这两者都不占用 DSH 官方 `openai` / `openai-codex` 路由，也不读取其他插件或 Codex CLI 的凭据。Host 负责 OAuth 回调、令牌刷新与存储；Client 仅取得显示所需的脱敏状态和授权页面链接。
 
-`pnpm typecheck`、`pnpm test`、`pnpm test:package` 包括 Host/Client 类型检查、模拟授权/适配器测试及构建后的 Client 激活检查；**这些检查不能替代**真实 Loader/profile 组合、真实授权/模型调用、Desktop 测试或额度接口验证。更详细的实施和验收边界见[实施计划](docs/IMPLEMENTATION_PLAN.md)。
+## 已知限制与延期工作
 
-开发时先读 [AGENTS.md](AGENTS.md)。本仓库的 `.agents/` 仅提供开发参考。更多接口背景：[DSH 插件管理说明](https://github.com/deepseek-ai/deepseek-harness/blob/477b4f420553e8a52c2fbccc464d7561b239c443/apps/cli/reference/README.zh.md)、[DSH 设置槽位](https://github.com/deepseek-ai/deepseek-harness/blob/477b4f420553e8a52c2fbccc464d7561b239c443/packages/client/ui-settings/src/client/contract/slots.ts)、[Codex App Server 账户接口](https://developers.openai.com/codex/app-server#authentication-and-account-apis)。
+- 仅声明文本和普通工具调用支持；图像、deferred tools 与 stop sequences 不受支持。模型、取消与工具调用仍缺真实账号验证；登录状态刷新、退出与卸载的竞态只经过确定性的模拟测试，未在真实账号下验证。
+- 没有订阅额度、重置时间或 reset 卡功能。一次请求的 token 用量**不是**订阅额度，不能据此推算账户剩余额度。
+- Desktop 的安装、窗口适配与系统浏览器授权尚未实测；不要把 Web 的模拟或构建测试视为 Desktop 验收。不同电脑之间不复制 OAuth 凭据文件。
+- 不要在仓库、日志、聊天或截图中披露令牌、授权码、完整 OAuth 回调 URL 或真实服务端响应。
+
+## 开发与发布
+
+本仓库定义 `pnpm typecheck`、`pnpm test`、`pnpm test:package`；它们覆盖类型检查、模拟测试和构建后的 Client 激活，但**不替代**真实 Loader/profile 与账号测试。架构及分阶段验收见[实施计划](https://github.com/HuaiminHuang/dsh-subscription-plugin/blob/main/docs/IMPLEMENTATION_PLAN.md)；维护者发布 tarball 的条件与流程见[发布说明](https://github.com/HuaiminHuang/dsh-subscription-plugin/blob/main/docs/RELEASING.md)。修改本项目时还应遵循 [AGENTS.md](https://github.com/HuaiminHuang/dsh-subscription-plugin/blob/main/AGENTS.md)。

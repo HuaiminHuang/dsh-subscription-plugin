@@ -1,6 +1,6 @@
 {
   "name": "@h2mzzz/dsh-openai-subscription",
-  "version": "0.0.0",
+  "version": "0.0.2",
   "description": "Opt-in ChatGPT Codex subscription provider for DeepSeek Harness",
   "private": true,
   "type": "module",
@@ -36,7 +36,9 @@
     "lib/typert.remote-client.d.ts",
     "lib/client.js.map",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "README.en.md",
+    "LICENSE"
   ],
   "license": "MIT",
   "engines": {

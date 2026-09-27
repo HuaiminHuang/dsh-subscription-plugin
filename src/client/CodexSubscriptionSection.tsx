@@ -41,7 +41,9 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
   const state = useCodexState(value => value)
   const [copied, setCopied] = useState(false)
   const [methodsExpanded, setMethodsExpanded] = useState(false)
+  const [operationFailed, setOperationFailed] = useState(false)
   const pendingBrowserTab = useRef<Window | null>(null)
+  const mounted = useRef(true)
   const busy = state.status === 'signing-in' || state.status === 'checking'
   const canSignIn = state.status === 'signed-out' || state.status === 'error'
   const label = state.status === 'signed-in' ? t('signedIn')
@@ -55,6 +57,8 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
   useEffect(() => {
     setCopied(false)
   }, [state.notice?.url])
+
+  useEffect(() => { setOperationFailed(false) }, [state.revision])
 
   useEffect(() => {
     const tab = pendingBrowserTab.current
@@ -73,7 +77,18 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
     }
   }, [state.status, state.method, state.notice?.url])
 
-  useEffect(() => () => { pendingBrowserTab.current?.close() }, [])
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false; pendingBrowserTab.current?.close() }
+  }, [])
+
+  const runOperation = (operation: Promise<unknown>, onFailure?: () => void): void => {
+    setOperationFailed(false)
+    void operation.catch(() => {
+      try { onFailure?.() } catch { /* The operation failure still needs safe feedback. */ }
+      if (mounted.current) setOperationFailed(true)
+    })
+  }
 
   const beginBrowserLogin = (): void => {
     setMethodsExpanded(false)
@@ -82,7 +97,7 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
     const tab = window.open('about:blank', '_blank')
     if (tab !== null) tab.opener = null
     pendingBrowserTab.current = tab
-    void operations.beginLogin('browser').catch(() => {
+    runOperation(operations.beginLogin('browser'), () => {
       if (pendingBrowserTab.current === tab) {
         pendingBrowserTab.current = null
         tab?.close()
@@ -93,12 +108,12 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
   const cancel = (attemptId: string): void => {
     pendingBrowserTab.current?.close()
     pendingBrowserTab.current = null
-    void operations.cancelLogin(attemptId)
+    runOperation(operations.cancelLogin(attemptId))
   }
 
   const beginDeviceLogin = (): void => {
     setMethodsExpanded(false)
-    void operations.beginLogin('device_code')
+    runOperation(operations.beginLogin('device_code'))
   }
 
   return (
@@ -117,7 +132,7 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
             {state.status === 'signing-in' && state.attemptId !== undefined ? (
               <Button variant="outline" size="sm" onClick={() => { cancel(state.attemptId!) }}>{t('cancel')}</Button>
             ) : state.status === 'signed-in' ? (
-              <Button variant="ghost" size="sm" onClick={() => { void operations.signOut() }}>{t('signOut')}</Button>
+              <Button variant="ghost" size="sm" onClick={() => { runOperation(operations.signOut()) }}>{t('signOut')}</Button>
             ) : canSignIn ? (
               <Button variant="primary" size="sm" aria-expanded={methodsExpanded} aria-controls="codex-subscription-methods"
                 onClick={() => { setMethodsExpanded(expanded => !expanded) }}>
@@ -127,6 +142,7 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
           </div>
         </div>
         {error !== undefined && <p className={css.error} role="status">{error}</p>}
+        {error === undefined && operationFailed && <p className={css.error} role="alert">{t('operationFailed')}</p>}
         {state.notice !== undefined && (
           <div className={css.notice}>
             <p>{state.notice.kind === 'browser' ? t('browserNotice')
@@ -134,11 +150,16 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
             {state.notice.code !== undefined && <code className={css.code}>{state.notice.code}</code>}
             {state.notice.url !== undefined && (
               <div className={css.actions}>
-                <Button variant="outline" size="sm" onClick={() => { window.open(state.notice?.url, '_blank', 'noopener,noreferrer') }}>
+                <Button variant="outline" size="sm" onClick={() => {
+                  try { window.open(state.notice?.url, '_blank', 'noopener,noreferrer') }
+                  catch { setOperationFailed(true) }
+                }}>
                   {t('openLink')}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => {
-                  void navigator.clipboard.writeText(state.notice?.url ?? '').then(() => { setCopied(true) })
+                  runOperation(navigator.clipboard.writeText(state.notice?.url ?? '').then(() => {
+                    if (mounted.current) setCopied(true)
+                  }))
                 }}>
                   {copied ? t('copied') : t('copyLink')}
                 </Button>
