@@ -1,0 +1,87 @@
+/** Browser entry for the Codex subscription settings page and its isolated Remote. */
+import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type { Context } from '@deepseek-ai/cordis'
+import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
+import type { CodexSubscriptionState } from '../types.ts'
+import remote from '../remote.ts'
+import { CodexSubscriptionSection, type CodexSubscriptionOperations } from './CodexSubscriptionSection.tsx'
+import { install as installStyles } from './CodexSubscriptionSection.module.css'
+import { en, zh } from './locales.ts'
+
+export const inject = ['remote', 'slots', 'locale']
+
+class StateStore {
+  private readonly listeners = new Set<() => void>()
+  private state: CodexSubscriptionState = { status: 'checking', models: [] }
+
+  getSnapshot = (): CodexSubscriptionState => this.state
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener)
+    return () => { this.listeners.delete(listener) }
+  }
+  set(state: CodexSubscriptionState): void {
+    this.state = state
+    for (const listener of this.listeners) listener()
+  }
+}
+
+function result<T>(response: RemoteResult<T>): T {
+  if (response.ok) return response.value
+  throw response.error
+}
+
+/** Mount the generated-equivalent Remote and a root settings page. */
+export async function apply(ctx: Context): Promise<() => Promise<void>> {
+  const disposeRemote = await ctx.remote.$mount(remote)
+  const disposeStyles = installStyles()
+  const store = new StateStore()
+  const call = async <T>(operation: () => Promise<RemoteResult<T>>): Promise<T> => {
+    const next = result(await operation())
+    store.set(next as CodexSubscriptionState)
+    return next
+  }
+  const operations: CodexSubscriptionOperations = {
+    getState: () => call(() => ctx.remote.codexSubscription.getState()),
+    beginLogin: () => call(() => ctx.remote.codexSubscription.beginLogin()),
+    cancelLogin: attemptId => call(() => ctx.remote.codexSubscription.cancelLogin(attemptId)),
+    answerChoice: (attemptId, answer) => call(() => ctx.remote.codexSubscription.answerChoice(attemptId, answer)),
+    refreshLogin: () => call(() => ctx.remote.codexSubscription.refreshLogin()),
+    signOut: () => call(() => ctx.remote.codexSubscription.signOut()),
+  }
+  try { await operations.getState() } catch (error) {
+    disposeStyles()
+    await disposeRemote()
+    throw error
+  }
+  const stream = ctx.remote.codexSubscription.watch()
+  const watching = (async () => {
+    try { for await (const item of stream) store.set(item) } catch { /* connection resets retain the latest safe view */ }
+  })()
+  const ui = ctx.inject(['slots', 'locale'], (child) => {
+    const t = child.locale.bind('settings.codexSubscription')
+    child.effect(() => child.locale.register('settings.codexSubscription', { en, zh }))
+    child.slots.inject('settings.section', () => child.slots.register({
+      name: 'settings.section', id: 'codex-subscription', order: 12, label: () => t('nav'),
+      locale: 'settings.codexSubscription', inject: () => ({ operations, hooks: { state: store } }),
+    }, CodexSubscriptionSection))
+  })
+  try { await ui } catch (error) {
+    await ui.dispose()
+    stream.dispose()
+    await watching
+    disposeStyles()
+    await disposeRemote()
+    throw error
+  }
+  return async () => {
+    await ui.dispose()
+    stream.dispose()
+    await watching
+    disposeStyles()
+    await disposeRemote()
+  }
+}

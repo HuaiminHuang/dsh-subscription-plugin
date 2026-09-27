@@ -1,6 +1,6 @@
 # Codex 订阅插件实施计划
 
-**状态：待实施。** 本文记录拟交付行为和需要实验确认的接口，不是现有功能说明。核查基线为本地 DSH `0.1.7-rc.2` 源码和 2026-09-27 可见的 [Codex App Server 文档](https://developers.openai.com/codex/app-server)；发布前须对实际安装版本重新核查。
+**状态：阶段 1 开发中。** 已有独立 Bundle 骨架、Host/Client、pi-ai OAuth 桥接、独立凭据键与 `codex-subscription` 路由；没有完成真实账号、Loader/profile、Desktop 或额度验证。本文记录拟交付行为和需要实验确认的接口，不是现有功能说明。核查基线为本地 DSH `0.1.7-rc.2` 源码和 2026-09-27 可见的 [Codex App Server 文档](https://developers.openai.com/codex/app-server)；精确提交、依赖版本和本机检出限制见[兼容性基线](COMPATIBILITY_BASELINE.md)。发布前须对实际安装版本重新核查。
 
 ## 1. 目标与边界
 
@@ -32,7 +32,9 @@ Host 内按责任划分模块：
 1. **凭据与授权**：自有记录键（例如作用域 `dsh-openai-subscription`、ID `codex`）、pi-ai 凭据读写桥、浏览器授权交互、取消、退出；不能和其他插件共享可轮换的 refresh token 文件。
 2. **模型适配**：独有 DSH 路由（暂定 `codex-subscription`），内部 pi-ai provider 仍为 `openai-codex`；模型目录、请求转换、流事件转换、工具调用、图像能力声明、取消和错误分类都由这个模块负责。
 3. **额度读取**：只接收 Host 中已确认的登录态，按账户请求服务端，转换成受限的展示字段，设置请求超时；不得从一次响应的 token 用量推算订阅剩余量。
-4. **Host Remote**：查询状态、发起/取消授权、提交需要人工回填的回答、退出、读取/刷新额度，以及以后可能加入的 reset 卡确认操作。尝试 ID 绑定本次操作，不向其他尝试的页面投递授权码或 token。
+4. **Host Remote**：查询状态、发起/取消授权、退出、读取/刷新额度，以及以后可能加入的 reset 卡确认操作。尝试 ID 绑定本次操作，不向其他尝试的页面投递授权码或 token；授权码、完整回调 URL 与手动回填输入不经过 Remote。
+
+当前实现额外约束：pi-ai 浏览器 OAuth 内部同时提供 loopback 和手动回填路径。插件只等待 Host 上的 loopback 完成；它不会把授权码、完整 redirect URL 或手动回填输入投影到 Client Remote。这样远程浏览器后备尚未验证前，不会形成把 OAuth 机密送进浏览器的伪实现。
 
 Client 只拥有设置页展示状态、焦点/弹窗和取消动作；Host 拥有登录是否完成、token、模型路由可用性和额度事实。所有产品可见文本经插件自己的中英文 locale 字典提供。页面关闭、断线、插件禁用都应终止未完成的交互并收尾 Host 资源；两次并发登录同一记录必须明确拒绝或复用唯一尝试，而非并行写入。
 
@@ -89,7 +91,7 @@ Host → Client 的最小额度视图建议为：`fetchedAt`、可选 `plan`、�
 
 ### 阶段 1：可使用的模型订阅插件
 
-- 交付一个包含 Host 与 Client 的 Bundle，以及设置入口、登录/取消/退出、凭据和独立 Codex `LlmAdapter`。
+- 交付一个包含 Host 与 Client 的 Bundle，以及设置入口、登录/取消/退出、凭据和独立 Codex `LlmAdapter`。**进行中：** 已完成源码实现和纯转换/凭据单元测试；待完成真实 Loader/profile 组合与安装包测试。
 - 通过真实 Loader/profile 组合测试注册和卸载，而非只手工 `ctx.plugin()`；测试登录失败、授权取消、token 刷新、跨进程重新启动、没有 API Key、路由冲突和禁用后的 UI/Remote/路由撤销。
 - 通过一次真实 Codex 对话验证文本、工具调用、续轮、取消和归因；不支持的内容必须明确拒绝。未取得账户或权限时，真实 API 用例明确跳过，不能以 mock 通过宣称真实授权成功。
 

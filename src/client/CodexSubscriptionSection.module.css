@@ -1,0 +1,131 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.title,
+.modelsTitle,
+.intro,
+.notice p,
+.error,
+.safeNotice,
+.empty {
+  margin: 0;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.intro {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 0.5px solid var(--dsw-alias-settings-card-stroke);
+  border-radius: var(--dsw-radius-xl);
+  background: var(--dsw-alias-settings-card-fill);
+}
+
+.status,
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status {
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 500;
+}
+
+.notice,
+.prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-module-platform);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.prompt label {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.prompt select {
+  min-height: 36px;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-module-platform);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+}
+
+.code,
+.models code {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.error {
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.safeNotice,
+.empty {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.modelsTitle {
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 500;
+}
+
+.models {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.models li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-module-platform);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+@media (max-width: 460px) {
+  .models li {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+}

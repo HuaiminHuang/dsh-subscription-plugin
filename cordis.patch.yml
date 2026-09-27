@@ -1,0 +1,4 @@
+# Opt-in Bundle: this package owns its complete Host and Client integration.
+- insert:
+    - id: openai-subscription
+      name: dsh-openai-subscription
