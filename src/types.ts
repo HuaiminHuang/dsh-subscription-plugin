@@ -1,21 +1,21 @@
 /** Client-safe view of the Codex subscription login lifecycle. */
 export type CodexLoginStatus = 'checking' | 'signed-out' | 'signing-in' | 'signed-in' | 'error'
 
-/** One prompt that the Host is waiting for the current settings page to answer. */
-export interface CodexLoginPrompt {
-  readonly kind: 'select'
-  readonly message: string
-  readonly options: readonly { readonly id: string; readonly label: string; readonly description?: string }[]
-}
+/** The two Codex OAuth methods verified in the targeted pi-ai release. */
+export type CodexLoginMethod = 'browser' | 'device_code'
 
 /** Safe, token-free state displayed by the settings page. */
 export interface CodexSubscriptionState {
   readonly status: CodexLoginStatus
+  /** Non-secret Host lifetime marker for comparing revisions after a reconnect. */
+  readonly instanceId?: string
+  /** Monotonic within one Host lifetime; a delayed snapshot must not erase a newer notice. */
+  readonly revision?: number
   readonly attemptId?: string
-  readonly notice?: { readonly message: string; readonly url?: string; readonly code?: string }
-  readonly prompt?: CodexLoginPrompt
+  readonly method?: CodexLoginMethod
+  readonly notice?: { readonly kind: 'browser' | 'device_code' | 'progress'; readonly url?: string; readonly code?: string }
   readonly models: readonly { readonly id: string; readonly name: string }[]
   /** Stable, non-provider error category; presentation stays in Client locales. */
-  readonly error?: 'login-failed' | 'saved-login-unavailable'
+  readonly error?: 'login-failed' | 'login-timeout' | 'saved-login-unavailable'
   readonly checkedAt?: string
 }

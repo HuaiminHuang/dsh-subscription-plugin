@@ -1,7 +1,7 @@
 .section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   max-width: 720px;
   color: var(--dsw-alias-label-primary);
 }
@@ -11,7 +11,6 @@
 .intro,
 .notice p,
 .error,
-.safeNotice,
 .empty {
   margin: 0;
 }
@@ -33,17 +32,24 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border: 0.5px solid var(--dsw-alias-settings-card-stroke);
   border-radius: var(--dsw-radius-xl);
   background: var(--dsw-alias-settings-card-fill);
 }
 
+.cardHeader,
 .status,
+.headerActions,
 .actions {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.cardHeader {
+  justify-content: space-between;
+  flex-wrap: wrap;
 }
 
 .status {
@@ -52,8 +58,15 @@
   font-weight: 500;
 }
 
-.notice,
-.prompt {
+.headerActions {
+  margin-left: auto;
+}
+
+.actions {
+  flex-wrap: wrap;
+}
+
+.notice {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -64,17 +77,25 @@
   line-height: 20px;
 }
 
-.prompt label {
-  color: var(--dsw-alias-label-secondary);
+.methodList {
+  display: grid;
+  gap: 8px;
 }
 
-.prompt select {
-  min-height: 36px;
-  border: 0.5px solid var(--dsw-alias-border-l3);
-  border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-module-platform);
-  color: var(--dsw-alias-label-primary);
-  font: inherit;
+.method {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 16px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.methodButton {
+  box-sizing: border-box;
+  width: 128px;
+  justify-self: end;
 }
 
 .code,
@@ -89,7 +110,6 @@
   line-height: 20px;
 }
 
-.safeNotice,
 .empty {
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
@@ -123,6 +143,14 @@
 }
 
 @media (max-width: 460px) {
+  .method {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .methodButton {
+    justify-self: start;
+  }
+
   .models li {
     align-items: flex-start;
     flex-direction: column;

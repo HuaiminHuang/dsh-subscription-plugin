@@ -8,7 +8,7 @@
 import { TYPERT_REMOTE } from './remote.ts'
 
 export const TYPERT = {
-  package: 'dsh-openai-subscription',
+  package: '@h2mzzz/dsh-openai-subscription',
   face: 'host',
   schemas: [],
   invocations: TYPERT_REMOTE.descriptors,

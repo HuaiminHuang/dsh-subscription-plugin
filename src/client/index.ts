@@ -24,6 +24,9 @@ class StateStore {
     return () => { this.listeners.delete(listener) }
   }
   set(state: CodexSubscriptionState): void {
+    if (state.instanceId !== undefined && state.instanceId === this.state.instanceId
+      && state.revision !== undefined && this.state.revision !== undefined
+      && state.revision < this.state.revision) return
     this.state = state
     for (const listener of this.listeners) listener()
   }
@@ -44,19 +47,19 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     store.set(next as CodexSubscriptionState)
     return next
   }
-  const operations: CodexSubscriptionOperations = {
-    getState: () => call(() => ctx.remote.codexSubscription.getState()),
-    beginLogin: () => call(() => ctx.remote.codexSubscription.beginLogin()),
-    cancelLogin: attemptId => call(() => ctx.remote.codexSubscription.cancelLogin(attemptId)),
-    answerChoice: (attemptId, answer) => call(() => ctx.remote.codexSubscription.answerChoice(attemptId, answer)),
-    refreshLogin: () => call(() => ctx.remote.codexSubscription.refreshLogin()),
-    signOut: () => call(() => ctx.remote.codexSubscription.signOut()),
-  }
-  const ui = ctx.inject(['slots', 'locale'], (child) => {
+  // The namespace is installed by $mount above. Only the child that declares
+  // its service dependency may access child.remote.codexSubscription.
+  const ui = ctx.inject(['slots', 'locale', 'remote.codexSubscription'], (child) => {
     const t = child.locale.bind('settings.codexSubscription')
+    const operations: CodexSubscriptionOperations = {
+      getState: () => call(() => child.remote.codexSubscription.getState()),
+      beginLogin: method => call(() => child.remote.codexSubscription.beginLogin(method)),
+      cancelLogin: attemptId => call(() => child.remote.codexSubscription.cancelLogin(attemptId)),
+      signOut: () => call(() => child.remote.codexSubscription.signOut()),
+    }
     child.effect(() => child.locale.register('settings.codexSubscription', { en, zh }))
     child.effect(() => {
-      let stream: ReturnType<typeof ctx.remote.codexSubscription.watch> | undefined
+      let stream: ReturnType<typeof child.remote.codexSubscription.watch> | undefined
       let watching: Promise<void> | undefined
       const synchronize = (): void => {
         // Client transport starts after Loader activation. These calls are
@@ -64,7 +67,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
         // package's Client entry; connection/reset invokes them again.
         void operations.getState().catch(() => {})
         stream?.dispose()
-        stream = ctx.remote.codexSubscription.watch()
+        stream = child.remote.codexSubscription.watch()
         const current = stream
         watching = (async () => {
           try {

@@ -3,23 +3,20 @@ import { Context } from '@deepseek-ai/cordis'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { createModels } from '@earendil-works/pi-ai'
 import type { Api, AuthEvent, AuthPrompt, Model, MutableModels } from '@earendil-works/pi-ai'
-import type { AuthorizationFlow, AuthorizationNotice, AuthorizationPrompt } from '@deepseek-ai/dsh-authorization'
+import type { AuthorizationFlow, AuthorizationNotice } from '@deepseek-ai/dsh-authorization'
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { AdapterRegistrationHandle } from '@deepseek-ai/dsh-llm'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import type { CodexLoginPrompt, CodexSubscriptionState } from './types.ts'
+import type { CodexLoginMethod, CodexSubscriptionState } from './types.ts'
 import { CodexSubscriptionAdapter } from './adapter.ts'
 import { CODEX_CREDENTIAL_KEY, PI_PROVIDER_ID, PROVIDER_ID } from './constants.ts'
 import { codexCredentialStore, isolatedAuthContext } from './credential-store.ts'
 
-interface PendingPrompt {
-  readonly view: CodexLoginPrompt
-  readonly settle: (answer: string | Error) => void
-}
-
 interface Attempt {
   readonly id: string
-  pending?: PendingPrompt
+  readonly controller: AbortController
+  readonly timer: ReturnType<typeof setTimeout>
+  timedOut: boolean
 }
 
 /** Host owner for the Codex login lifecycle, route registration, and safe Remote state. */
@@ -31,7 +28,9 @@ export class CodexSubscriptionController extends TypertRemoteService {
   private readonly activeRequests = new Set<AbortController>()
   private registration: AdapterRegistrationHandle | undefined
   private attempt: Attempt | undefined
-  private state: CodexSubscriptionState = { status: 'checking', models: [] }
+  private readonly instanceId = randomUUID()
+  private state: CodexSubscriptionState = { status: 'checking', models: [], instanceId: this.instanceId, revision: 0 }
+  private revision = 0
   private readonly listeners = new Set<() => void>()
 
   constructor(ctx: Context) {
@@ -41,6 +40,11 @@ export class CodexSubscriptionController extends TypertRemoteService {
     this.adapter = new CodexSubscriptionAdapter(this)
     ctx.effect(() => this.registerFlow())
     ctx.effect(() => () => {
+      if (this.attempt !== undefined) {
+        clearTimeout(this.attempt.timer)
+        this.attempt.controller.abort()
+        this.attempt = undefined
+      }
       this.ctx.authorization.cancel(CODEX_CREDENTIAL_KEY)
       this.registration?.()
       this.registration = undefined
@@ -50,7 +54,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
     void this.refreshLoginState()
   }
 
-  /** The current account-allowed static provider models, after an authenticated preflight. */
+  /** The installed pi-ai Codex catalog after a saved OAuth grant is found; server access is unverified. */
   availableModels(): readonly Model<Api>[] {
     return this.state.status === 'signed-in' ? this.models.getModels(PI_PROVIDER_ID) : []
   }
@@ -75,35 +79,52 @@ export class CodexSubscriptionController extends TypertRemoteService {
   @Remote
   getState(): CodexSubscriptionState { return this.state }
 
-  /** Start the only permitted login attempt for this plugin-owned credential. */
+  /** Start one explicitly selected Codex OAuth method for this plugin-owned credential. */
   @Remote
-  beginLogin(): CodexSubscriptionState {
+  beginLogin(method: CodexLoginMethod): CodexSubscriptionState {
+    if (method !== 'browser' && method !== 'device_code') {
+      throw new LlmError('Unknown Codex sign-in method', 'INVALID_AUTHORIZATION_METHOD')
+    }
     if (this.attempt !== undefined) return this.state
-    const attempt: Attempt = { id: randomUUID() }
+    const controller = new AbortController()
+    const attempt: Attempt = {
+      id: randomUUID(), controller, timedOut: false,
+      timer: setTimeout(() => {
+        attempt.timedOut = true
+        controller.abort()
+      }, method === 'browser' ? 10 * 60_000 : 16 * 60_000),
+    }
+    attempt.timer.unref()
     this.attempt = attempt
-    this.publish({ status: 'signing-in', attemptId: attempt.id, models: [] })
+    this.publish({ status: 'signing-in', attemptId: attempt.id, method, models: [] })
     void this.ctx.authorization.begin({
       key: CODEX_CREDENTIAL_KEY,
+      method,
+      signal: controller.signal,
       interaction: {
         notify: notice => this.notice(attempt, notice),
-        prompt: prompt => this.prompt(attempt, prompt),
+        prompt: () => Promise.reject(new LlmError('Unexpected Codex sign-in prompt', 'UNSUPPORTED_OPTION')),
       },
     }).then(
       async outcome => {
+        clearTimeout(attempt.timer)
         if (this.attempt !== attempt) return
         this.attempt = undefined
         if (outcome.status === 'cancelled') {
-          this.publish({ status: 'signed-out', models: [], checkedAt: new Date().toISOString() })
+          this.publish(attempt.timedOut
+            ? { status: 'error', error: 'login-timeout', models: [], checkedAt: new Date().toISOString() }
+            : { status: 'signed-out', models: [], checkedAt: new Date().toISOString() })
           return
         }
         await this.refreshLoginState()
       },
       () => {
+        clearTimeout(attempt.timer)
         if (this.attempt !== attempt) return
         this.attempt = undefined
         this.publish({
           status: 'error', models: [], checkedAt: new Date().toISOString(),
-          error: 'login-failed',
+          error: attempt.timedOut ? 'login-timeout' : 'login-failed',
         })
       },
     )
@@ -114,33 +135,8 @@ export class CodexSubscriptionController extends TypertRemoteService {
   @Remote
   cancelLogin(attemptId: string): CodexSubscriptionState {
     if (this.attempt?.id !== attemptId) return this.state
-    this.attempt.pending?.settle(new Error('login cancelled'))
+    this.attempt.controller.abort()
     this.ctx.authorization.cancel(CODEX_CREDENTIAL_KEY)
-    return this.state
-  }
-
-  /** Submit one validated choice to the current non-secret OAuth method picker. */
-  @Remote
-  answerChoice(attemptId: string, answer: string): CodexSubscriptionState {
-    const attempt = this.attempt
-    if (attempt?.id !== attemptId || attempt.pending === undefined) {
-      throw new LlmError('The Codex login prompt is no longer active', 'STALE_AUTHORIZATION_PROMPT')
-    }
-    if (!attempt.pending.view.options.some(option => option.id === answer)) {
-      throw new LlmError('The selected Codex login method is not offered by this attempt', 'INVALID_AUTHORIZATION_PROMPT')
-    }
-    const pending = attempt.pending
-    attempt.pending = undefined
-    pending.settle(answer)
-    this.publish({ ...this.state, prompt: undefined })
-    return this.state
-  }
-
-  /** Recheck the saved grant without deleting it; a failed check never signs the user out. */
-  @Remote
-  async refreshLogin(): Promise<CodexSubscriptionState> {
-    if (this.attempt !== undefined) return this.state
-    await this.refreshLoginState()
     return this.state
   }
 
@@ -148,7 +144,8 @@ export class CodexSubscriptionController extends TypertRemoteService {
   @Remote
   async signOut(): Promise<CodexSubscriptionState> {
     if (this.attempt !== undefined) {
-      this.attempt.pending?.settle(new Error('login cancelled'))
+      clearTimeout(this.attempt.timer)
+      this.attempt.controller.abort()
       this.ctx.authorization.cancel(CODEX_CREDENTIAL_KEY)
       this.attempt = undefined
     }
@@ -162,8 +159,16 @@ export class CodexSubscriptionController extends TypertRemoteService {
   /** Follow safe state changes for a mounted settings page. */
   @Remote({ mode: 'stream' })
   async * watch(signal: AbortSignal): AsyncIterable<CodexSubscriptionState> {
+    let seen = this.revision
     yield this.state
     while (!signal.aborted) {
+      // A notice can arrive while the consumer processes the previous yield.
+      // Do not wait for another publish before delivering that latest snapshot.
+      if (seen !== this.revision) {
+        seen = this.revision
+        yield this.state
+        continue
+      }
       await new Promise<void>(resolve => {
         const listener = (): void => {
           this.listeners.delete(listener)
@@ -172,16 +177,22 @@ export class CodexSubscriptionController extends TypertRemoteService {
         }
         this.listeners.add(listener)
         signal.addEventListener('abort', listener, { once: true })
+        if (signal.aborted || seen !== this.revision) listener()
       })
-      if (!signal.aborted) yield this.state
+      if (signal.aborted) break
+      seen = this.revision
+      yield this.state
     }
   }
 
   private registerFlow(): () => void {
     const flow: AuthorizationFlow = {
       key: CODEX_CREDENTIAL_KEY,
-      label: 'OpenAI / Codex subscription',
-      methods: [{ id: 'oauth', label: '使用 ChatGPT 登录' }],
+      label: 'OpenAI',
+      methods: [
+        { id: 'browser', label: '浏览器登录' },
+        { id: 'device_code', label: '设备代码登录' },
+      ],
       run: async session => {
         await this.models.login(PI_PROVIDER_ID, 'oauth', {
           signal: session.signal,
@@ -189,9 +200,16 @@ export class CodexSubscriptionController extends TypertRemoteService {
           // pi-ai starts a manual fallback prompt beside its loopback listener.
           // Keep that promise Host-local: a redirect URL or authorization code
           // must never cross the browser Remote.
-          prompt: prompt => prompt.type === 'manual_code'
-            ? this.awaitLoopback(prompt.signal)
-            : session.prompt(this.authorizationPrompt(prompt)),
+          prompt: prompt => {
+            if (prompt.type === 'select') {
+              if (!prompt.options.some(option => option.id === session.method)) {
+                throw new LlmError('The selected Codex sign-in method is unavailable', 'UNSUPPORTED_OPTION')
+              }
+              return Promise.resolve(session.method)
+            }
+            if (prompt.type === 'manual_code' && session.method === 'browser') return this.awaitLoopback(prompt.signal)
+            throw new LlmError('Codex credential input must remain on the Host', 'UNSUPPORTED_OPTION')
+          },
         })
       },
     }
@@ -224,58 +242,38 @@ export class CodexSubscriptionController extends TypertRemoteService {
 
   private notice(attempt: Attempt, notice: AuthorizationNotice): void {
     if (this.attempt !== attempt) return
-    this.publish({ ...this.state, notice })
-  }
-
-  private prompt(attempt: Attempt, prompt: AuthorizationPrompt): Promise<string> {
-    if (this.attempt !== attempt) return Promise.reject(new Error('stale login attempt'))
-    return new Promise<string>((resolve, reject) => {
-      const abort = (): void => settle(new Error('login cancelled'))
-      const settle = (value: string | Error): void => {
-        prompt.signal?.removeEventListener('abort', abort)
-        if (attempt.pending?.settle === settle) attempt.pending = undefined
-        value instanceof Error ? reject(value) : resolve(value)
-      }
-      attempt.pending = { view: this.promptView(prompt), settle }
-      prompt.signal?.addEventListener('abort', abort, { once: true })
-      if (prompt.signal?.aborted) abort()
-      else this.publish({ ...this.state, prompt: attempt.pending.view })
-    })
+    // Provider progress must not replace a still-actionable authorization link.
+    if (notice.url === undefined && notice.code === undefined && this.state.notice?.url !== undefined) return
+    const kind = notice.url === undefined ? 'progress' : this.state.method ?? 'progress'
+    this.publish({ ...this.state, notice: {
+      kind,
+      ...notice.url === undefined ? {} : { url: notice.url },
+      ...notice.code === undefined ? {} : { code: notice.code },
+    } })
   }
 
   private authorizationNotice(event: AuthEvent): AuthorizationNotice {
     switch (event.type) {
-      case 'auth_url': return { message: event.instructions ?? '请在浏览器中继续登录', url: this.safeUrl(event.url) }
-      case 'device_code': return { message: '请在验证页面输入代码', url: this.safeUrl(event.verificationUri), code: event.userCode }
-      case 'info': return { message: event.message, ...event.links?.[0] === undefined ? {} : { url: this.safeUrl(event.links[0].url) } }
-      case 'progress': return { message: event.message }
+      case 'auth_url': return { message: 'browser', url: this.authorizationUrl(event.url) }
+      case 'device_code': {
+        if (typeof event.userCode !== 'string' || !/^[A-Za-z0-9-]{4,64}$/.test(event.userCode)) {
+          throw new LlmError('Invalid Codex device verification code', 'INVALID_AUTHORIZATION_NOTICE')
+        }
+        return { message: 'device_code', url: this.authorizationUrl(event.verificationUri), code: event.userCode }
+      }
+      case 'info':
+      case 'progress': return { message: 'progress' }
     }
   }
 
-  private authorizationPrompt(prompt: AuthPrompt): AuthorizationPrompt {
-    const signal = prompt.signal === undefined ? {} : { signal: prompt.signal }
-    switch (prompt.type) {
-      case 'select': return { ...signal, kind: 'select', message: prompt.message, options: prompt.options }
-      case 'secret':
-      case 'text':
-      case 'manual_code': throw new LlmError('Codex credential input must remain on the Host', 'UNSUPPORTED_OPTION')
-    }
-  }
-
-  private promptView(prompt: AuthorizationPrompt): CodexLoginPrompt {
-    switch (prompt.kind) {
-      case 'select': return { kind: 'select', message: prompt.message, options: prompt.options }
-      case 'secret':
-      case 'text': throw new LlmError('Codex login exposes only non-secret choices to Client', 'UNSUPPORTED_OPTION')
-    }
-  }
-
-  private safeUrl(value: string): string | undefined {
+  private authorizationUrl(value: string): string {
     try {
-      return new URL(value).protocol === 'https:' ? value : undefined
+      const url = new URL(value)
+      if (url.protocol === 'https:' && url.hostname === 'auth.openai.com') return url.toString()
     } catch {
-      return undefined
+      // An invalid provider URL is not an actionable login notice.
     }
+    throw new LlmError('Invalid Codex authorization page', 'INVALID_AUTHORIZATION_NOTICE')
   }
 
   /** Wait until pi-ai closes its manual fallback after loopback completion or cancellation. */
@@ -287,7 +285,8 @@ export class CodexSubscriptionController extends TypertRemoteService {
   }
 
   private publish(next: CodexSubscriptionState): void {
-    this.state = Object.freeze(next)
+    this.revision++
+    this.state = Object.freeze({ ...next, instanceId: this.instanceId, revision: this.revision })
     for (const listener of this.listeners) listener()
   }
 }

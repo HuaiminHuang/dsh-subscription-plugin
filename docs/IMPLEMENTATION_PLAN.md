@@ -1,10 +1,10 @@
 # Codex 订阅插件实施计划
 
-**状态：阶段 1 开发中。** 已有独立 Bundle 骨架、Host/Client、pi-ai OAuth 桥接、独立凭据键与 `codex-subscription` 路由；没有完成真实账号、Loader/profile、Desktop 或额度验证。本文记录拟交付行为和需要实验确认的接口，不是现有功能说明。核查基线为本地 DSH `0.1.7-rc.2` 源码和 2026-09-27 可见的 [Codex App Server 文档](https://developers.openai.com/codex/app-server)；精确提交、依赖版本和本机检出限制见[兼容性基线](COMPATIBILITY_BASELINE.md)。发布前须对实际安装版本重新核查。
+**状态：阶段 1 开发中。** 已有独立 Bundle 骨架、Host/Client、pi-ai OAuth 桥接、独立凭据键与 `codex-subscription` 路由；构建包的 Host/Client 清单和 Client 激活已检查，但没有完成真实账号、真实 Loader/profile 组合、Desktop 或额度验证。本文记录拟交付行为和需要实验确认的接口，不是现有功能说明。核查基线为本地 DSH `0.1.7-rc.2` 源码和 2026-09-27 可见的 [Codex App Server 文档](https://developers.openai.com/codex/app-server)；精确提交、依赖版本和本机检出限制见[兼容性基线](COMPATIBILITY_BASELINE.md)。发布前须对实际安装版本重新核查。
 
 ## 1. 目标与边界
 
-用户从目标 DSH profile 的 Plugins 页面启用一个独立 Bundle，在原有设置窗口的 **OpenAI / Codex** 页面完成 ChatGPT 浏览器授权；授权后从原有会话模型选择器选择 Codex 模型，通过 DSH `LlmAdapter` 完成真实对话，并在设置页查看该账户实际提供的额度窗口、已用比例与重置时间。可用 reset 卡如能从同一登录态可靠读取，单独展示；使用 reset 卡必须由用户明确确认。
+用户从目标 DSH profile 的 Plugins 页面启用一个独立 Bundle，在原有设置窗口的 **OpenAI** 页面完成 ChatGPT 浏览器授权；授权后从原有会话模型选择器选择 Codex 模型，通过 DSH `LlmAdapter` 完成真实对话，并在设置页查看该账户实际提供的额度窗口、已用比例与重置时间。提供商展示名称为 OpenAI，路由 ID 保持独立的 `codex-subscription`，不占用官方可配置的 `openai`。可用 reset 卡如能从同一登录态可靠读取，单独展示；使用 reset 卡必须由用户明确确认。
 
 插件默认不进入 Web、Desktop 或 Headless 组合，不修改官方 `llm-pi-ai`、`ui-settings-models`、`api-remotes`、DeepSeek 账户页或 Electron 原生窗口。当前目标是一个只支持 Codex 的插件包；多提供商、多账号池、Fast 模式、生图、搜索、跨提供商故障转移和财务账单均不在首版范围内。不能把“订阅额度”解释成 DSH 一次模型调用的 `TokenUsage` 或用户实际付款金额。
 
@@ -25,7 +25,7 @@
 
 ## 3. 单包结构与数据所有权
 
-首版优先采用**一个外部 npm 包、两个运行入口**，而非先拆分多个服务包：`src/index.ts` 为 Cordis Host 插件，`src/client/index.ts` 为浏览器插件，`cordis.patch.yml` 提供一个独立 Loader entry；包元数据声明 `dsh.bundle.patch` 与 Web Client entry。仅在 Host/Client 有独立发布需求时再拆包。没有独立 Node 应用或额外的公开命令行入口；应用通过现有 `dsh` profile 启动。
+首版优先采用**一个外部 npm 包、两个运行入口**，而非先拆分多个服务包：包名为 `@h2mzzz/dsh-openai-subscription`（新 npm 包的 scope 必须使用小写），`src/index.ts` 为 Cordis Host 插件，`src/client/index.ts` 为浏览器插件，`cordis.patch.yml` 提供一个独立 Loader entry；包元数据声明 `dsh.bundle.patch` 与 Web Client entry。仅在 Host/Client 有独立发布需求时再拆包。没有独立 Node 应用或额外的公开命令行入口；应用通过现有 `dsh` profile 启动。凭据键保留无 scope 的历史值以兼容已有记录。
 
 Host 内按责任划分模块：
 
@@ -46,8 +46,8 @@ Bundle 装载后页面可见，即使没有 Codex 凭据也能点击登录。Hos
 
 ### 4.2 浏览器授权
 
-1. Client 调用插件 Remote 开始登录；Host 在授权服务注册的插件专属流程上执行 `begin()`，生成尝试 ID 并向该页面传递必要的通知与提示。
-2. pi-ai 的 Codex OAuth 流生成 ChatGPT 授权 URL；Client 只允许打开经过 Host 流程提供的 HTTPS 授权 URL，另提供复制链接。不要在 UI、Session、日志或错误中保存授权码、完整回调 URL、access token 或 refresh token。
+1. Client 先展示单一「登录」入口，点击后才展开浏览器登录和设备代码登录两个明确选项，不预选方式。点击浏览器登录时同步打开空白标签（避免异步弹窗拦截），然后调用插件 Remote `beginLogin('browser')`；设备代码入口不自动跳转。Host 在授权服务注册的插件专属流程上用同一 method 执行 `begin()`，生成尝试 ID。pi-ai 的内部方法选择由 Host 直接按本次选择回答，不再通过 Client 的二次选择提示。登录状态在启动、授权完成及状态流重连时同步，不提供误导性的手动“检查登录”接口。
+2. pi-ai 生成对应的 ChatGPT 授权 URL 或设备验证 URL/用户代码后，Client 显示链接操作（以及设备代码）。浏览器登录自动将已打开的空白标签导航到 Host 验证过的 OpenAI HTTPS 授权 URL；弹窗被拦截或导航失败时仍可手动点击链接按钮。设备代码方式需用户自行打开验证页。不要在 UI、Session、日志或错误中保存授权码、完整回调 URL、access token 或 refresh token。
 3. 同机浏览器通过 Host 侧 loopback callback 完成授权；Host 验证 OAuth state/PKCE 并在一次受控写入中提交凭据。远程 Web 浏览器无法回调 Host 的 localhost 时，按 pi-ai 实际提供的 device-code 或手动验证码路径显示提示。验证这一路径前，不将其宣称为可用。
 4. Host 返回已登录状态并触发模型目录更新，选择器出现经过当前账号验证的模型；用户选择后执行一轮含工具调用、取消和后续请求的真实对话。
 
@@ -55,7 +55,7 @@ Bundle 装载后页面可见，即使没有 Codex 凭据也能点击登录。Hos
 
 ### 4.3 模型调用
 
-插件优先使用 pi-ai 公开的 Codex provider 处理 OAuth 刷新和 Codex 请求协议，自己只承担 DSH `LlmAdapter` 的必要转换。`listModels()` 只公布当前账号可以使用且转换器确实支持的模型；`resolveModel()` 报告上下文、输入类型和推理档位时以已验证目录为准。`prepareCall()` 绑定目录与实际请求使用的同一代适配器状态，避免登录或配置变化让模型元数据与请求目标不一致。
+插件优先使用 pi-ai 公开的 Codex provider 处理 OAuth 刷新和 Codex 请求协议，自己只承担 DSH `LlmAdapter` 的必要转换。`listModels()` 仅在保存的凭据可用时公布锁定的 pi-ai 静态目录；这不证明单个模型已获服务端授权。`resolveModel()` 报告上下文、输入类型及该型号实际可发送的推理档位；支持 Medium 时将它声明为插件默认档位，直接调用适配器而未指定档位时也发送 Medium，显式选择优先。Web profile 的默认型号在其 `agent-default-model` 配置中设为 `gpt-5.6-terra`，不在插件内改写其他 profile 的默认选择。Minimal 若映射为 Low 则不重复呈现，"off" 若仅省略参数而不能关闭服务端思考则不呈现。`prepareCall()` 绑定目录与实际请求使用的同一代适配器状态，避免登录或配置变化让模型元数据与请求目标不一致。
 
 `stream()` 必须遵守 DSH `StreamChunk` 规则：usage 在 finish 前、finish 后不再发块；工具参数保留原始 JSON；取消传播到提供商流；提供商错误作为终止结果；请求附带 DSH 所要求的归因标头。图像或 provider-native replay 如不能在首版正确实现，必须声明为不支持并拒绝，不因目录宣称能力而悄悄降级。模型请求不可借 `OPENAI_API_KEY` 或原有 `llm-pi-ai` 账户回退，以免误用另一计费身份。
 
@@ -91,7 +91,7 @@ Host → Client 的最小额度视图建议为：`fetchedAt`、可选 `plan`、�
 
 ### 阶段 1：可使用的模型订阅插件
 
-- 交付一个包含 Host 与 Client 的 Bundle，以及设置入口、登录/取消/退出、凭据和独立 Codex `LlmAdapter`。**进行中：** 已完成源码实现和纯转换/凭据单元测试；待完成真实 Loader/profile 组合与安装包测试。
+- 交付一个包含 Host 与 Client 的 Bundle，以及设置入口、登录/取消/退出、凭据和独立 Codex `LlmAdapter`。**进行中：** 已完成源码实现、纯转换/凭据单元测试、构建包 Client 激活和 tarball 内容检查；待完成真实 Loader/profile 组合与安装实测。
 - 通过真实 Loader/profile 组合测试注册和卸载，而非只手工 `ctx.plugin()`；测试登录失败、授权取消、token 刷新、跨进程重新启动、没有 API Key、路由冲突和禁用后的 UI/Remote/路由撤销。
 - 通过一次真实 Codex 对话验证文本、工具调用、续轮、取消和归因；不支持的内容必须明确拒绝。未取得账户或权限时，真实 API 用例明确跳过，不能以 mock 通过宣称真实授权成功。
 

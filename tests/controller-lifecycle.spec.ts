@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import type { AuthorizationFlow } from '@deepseek-ai/dsh-authorization'
 import { CodexSubscriptionController } from '../src/controller.ts'
 
 interface Deferred<T> {
@@ -30,6 +31,8 @@ function controller(overrides: Record<string, unknown> = {}): CodexSubscriptionC
     activeRequests: new Set(),
     registration: undefined,
     attempt: undefined,
+    instanceId: 'test-host',
+    revision: 0,
     state: { status: 'checking', models: [] },
     listeners: new Set(),
     ...overrides,
@@ -38,29 +41,46 @@ function controller(overrides: Record<string, unknown> = {}): CodexSubscriptionC
 }
 
 describe('CodexSubscriptionController authorization lifecycle', () => {
-  it('cancels an active attempt, rejects its pending choice, then publishes signed-out only on the owned completion', async () => {
+  it('delivers a notice published between the first stream yield and its next read', async () => {
+    const instance = controller()
+    const abort = new AbortController()
+    const stream = instance.watch(abort.signal)[Symbol.asyncIterator]()
+    try {
+      expect((await stream.next()).value?.status).toBe('checking')
+      ;(instance as unknown as { publish(state: { status: 'signing-in'; models: never[]; notice: { kind: 'browser'; url: string } }): void })
+        .publish({ status: 'signing-in', models: [], notice: { kind: 'browser', url: 'https://auth.openai.com/oauth/authorize' } })
+      const next = await stream.next()
+      expect(next.value?.notice?.kind).toBe('browser')
+      expect(next.value?.revision).toBe(1)
+    } finally {
+      abort.abort()
+      await stream.next()
+    }
+  })
+
+  it('starts only the explicitly selected method; cancellation settles the owned attempt', async () => {
     const outcome = deferred<{ status: 'cancelled' }>()
-    const pending = deferred<string>()
     let cancelled = 0
+    let selected: string | undefined
     const instance = controller({
       ctx: {
-        authorization: { begin: () => outcome.promise, cancel: () => { cancelled++ } },
+        authorization: { begin: (request: { method: string }) => { selected = request.method; return outcome.promise }, cancel: () => { cancelled++ } },
         credentials: { deleteRecord: async () => {} },
         llm: { registerAdapter: () => Object.assign(() => {}, { replace: () => {} }) },
       },
     })
 
-    const started = instance.beginLogin()
+    expect(() => instance.beginLogin('invalid' as 'browser')).toThrow(/Unknown Codex sign-in method/)
+    expect(selected).toBeUndefined()
+    const started = instance.beginLogin('device_code')
+    expect(selected).toBe('device_code')
+    expect(started).toMatchObject({ status: 'signing-in', method: 'device_code' })
+    expect(started.notice).toBeUndefined()
     const attemptId = started.attemptId
     if (attemptId === undefined) throw new Error('expected a login attempt id')
-    ;(instance as unknown as { attempt: { pending?: { settle(value: string | Error): void } } }).attempt.pending = {
-      view: { kind: 'select', message: 'Choose', options: [{ id: 'browser', label: 'Browser' }] },
-      settle: value => value instanceof Error ? pending.reject(value) : pending.resolve(value),
-    }
 
     expect(instance.cancelLogin(attemptId).status).toBe('signing-in')
     expect(cancelled).toBe(1)
-    await expect(pending.promise).rejects.toThrow('login cancelled')
 
     outcome.resolve({ status: 'cancelled' })
     await outcome.promise
@@ -68,25 +88,82 @@ describe('CodexSubscriptionController authorization lifecycle', () => {
     expect(instance.getState()).toMatchObject({ status: 'signed-out', models: [] })
   })
 
-  it('accepts only a choice offered by the current attempt and clears the prompt after accepting it', async () => {
-    const answer = deferred<string>()
+  it('stops a browser attempt that never settles and reports a safe timeout', async () => {
+    vi.useFakeTimers()
+    try {
+      const outcome = deferred<{ status: 'cancelled' }>()
+      let signal!: AbortSignal
+      const instance = controller({
+        ctx: { authorization: { begin: (request: { signal: AbortSignal }) => {
+          signal = request.signal
+          return outcome.promise
+        }, cancel: () => {} } },
+      })
+      instance.beginLogin('browser')
+      await vi.advanceTimersByTimeAsync(10 * 60_000)
+      expect(signal.aborted).toBe(true)
+      outcome.resolve({ status: 'cancelled' })
+      await outcome.promise
+      await Promise.resolve()
+      expect(instance.getState()).toMatchObject({ status: 'error', error: 'login-timeout' })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the selected login link and code visible through progress updates', async () => {
+    const outcome = deferred<{ status: 'cancelled' }>()
+    let notify!: (notice: { message: string; url?: string; code?: string }) => void
     const instance = controller({
-      attempt: {
-        id: 'current',
-        pending: {
-          view: { kind: 'select', message: 'Choose', options: [{ id: 'browser', label: 'Browser' }] },
-          settle: value => value instanceof Error ? answer.reject(value) : answer.resolve(value),
-        },
-      },
-      state: {
-        status: 'signing-in', attemptId: 'current', models: [],
-        prompt: { kind: 'select', message: 'Choose', options: [{ id: 'browser', label: 'Browser' }] },
+      ctx: {
+        authorization: { begin: (request: { interaction: { notify: typeof notify } }) => {
+          notify = request.interaction.notify
+          return outcome.promise
+        }, cancel: () => {} },
       },
     })
+    instance.beginLogin('device_code')
+    notify({ message: 'device_code', url: 'https://auth.openai.com/codex/device', code: 'TEST-CODE' })
+    notify({ message: 'progress' })
+    expect(instance.getState().notice).toEqual({ kind: 'device_code', url: 'https://auth.openai.com/codex/device', code: 'TEST-CODE' })
+    outcome.resolve({ status: 'cancelled' })
+    await outcome.promise
+    await Promise.resolve()
+    expect(instance.getState().status).toBe('signed-out')
+  })
 
-    expect(() => instance.answerChoice('current', 'other')).toThrow(/not offered/)
-    expect(instance.answerChoice('current', 'browser')).toMatchObject({ status: 'signing-in', prompt: undefined })
-    await expect(answer.promise).resolves.toBe('browser')
+  it('routes both methods to pi-ai without forwarding a second choice prompt to Client', async () => {
+    let flow!: AuthorizationFlow
+    const selected: string[] = []
+    const notices: { message: string; url?: string; code?: string }[] = []
+    const instance = controller({
+      ctx: { authorization: { registerFlow: (registered: AuthorizationFlow) => { flow = registered; return () => {} } } },
+      models: { login: async (_provider: string, _mechanism: string, interaction: {
+        prompt: (prompt: { type: 'select'; options: { id: string }[] }) => Promise<string>
+        notify: (event: unknown) => void
+      }) => {
+        const method = await interaction.prompt({ type: 'select', options: [{ id: 'browser' }, { id: 'device_code' }] })
+        selected.push(method)
+        if (method === 'browser') interaction.notify({ type: 'auth_url', url: 'https://auth.openai.com/oauth/authorize', instructions: 'external text' })
+        else interaction.notify({ type: 'device_code', verificationUri: 'https://auth.openai.com/codex/device', userCode: 'ABCD-EFGH', intervalSeconds: 5, expiresInSeconds: 900 })
+      } },
+    })
+    ;(instance as unknown as { registerFlow(): () => void }).registerFlow()
+    expect(flow.methods.map(method => method.id)).toEqual(['browser', 'device_code'])
+    for (const method of ['browser', 'device_code']) {
+      await flow.run({ method, signal: new AbortController().signal, notify: notice => { notices.push(notice) }, prompt: async () => { throw new Error('unexpected Client prompt') }, commit: async () => {} })
+    }
+    expect(selected).toEqual(['browser', 'device_code'])
+    expect(notices).toEqual([
+      { message: 'browser', url: 'https://auth.openai.com/oauth/authorize' },
+      { message: 'device_code', url: 'https://auth.openai.com/codex/device', code: 'ABCD-EFGH' },
+    ])
+  })
+
+  it('rejects provider-supplied authorization links outside the OpenAI origin', () => {
+    const instance = controller()
+    expect(() => (instance as unknown as { authorizationUrl(value: string): string }).authorizationUrl('https://example.com/codex/device'))
+      .toThrow('Invalid Codex authorization page')
   })
 
   it('does not delete a saved credential when its non-destructive preflight fails', async () => {
@@ -102,7 +179,7 @@ describe('CodexSubscriptionController authorization lifecycle', () => {
       registration: Object.assign(() => {}, { replace: () => { withdrewRoute++ } }),
     })
 
-    await instance.refreshLogin()
+    await (instance as unknown as { refreshLoginState(): Promise<void> }).refreshLoginState()
     expect(instance.getState()).toMatchObject({ status: 'error', error: 'saved-login-unavailable', models: [] })
     expect(withdrewRoute).toBe(1)
     expect(deleted).toBe(0)

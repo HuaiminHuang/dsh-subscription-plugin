@@ -3,10 +3,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import { CodexSubscriptionController } from './controller.ts'
 
 export { CodexSubscriptionController } from './controller.ts'
-export type { CodexLoginPrompt, CodexLoginStatus, CodexSubscriptionState } from './types.ts'
+export type { CodexLoginMethod, CodexLoginStatus, CodexSubscriptionState } from './types.ts'
 
 /** Cordis Loader entry name. */
-export const name = 'dsh-openai-subscription'
+export const name = '@h2mzzz/dsh-openai-subscription'
 
 /** Required Host services for the first supported Web/Desktop compositions. */
 export const inject = ['llm', 'credentials', 'authorization']

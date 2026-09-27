@@ -1,46 +1,62 @@
-# DSH OpenAI Subscription
+# @h2mzzz/dsh-openai-subscription
 
-一个独立、默认不启用的 DeepSeek Harness Bundle：在现有设置窗口中登录 ChatGPT/Codex，并通过 DSH `LlmAdapter` 选择和使用 Codex 模型。
+独立、可选的 DeepSeek Harness (DSH) Bundle：在 DSH 设置窗口增加 **OpenAI** 页面，使用 ChatGPT/Codex 订阅登录，并通过插件自己的模型路由调用 Codex。**社区项目，非 DeepSeek 或 OpenAI 官方插件。**
 
-**状态：阶段 1 开发中，尚未完成真实账号或发行验证。** 已实现 Host、Client、独立凭据记录、独立模型路由和 pi-ai Codex OAuth 桥接；尚未实现额度读取或 reset 卡，也未声称已通过真实 ChatGPT 登录。
+**当前状态：开发中，尚未发布 npm 包，也未用真实账号完成授权、模型调用或额度验证。** 包版本为 `0.0.0` 且标记为 `private`；下述安装方法用于本地构建的包，不是可直接从 npm 仓库下载的发行版。
 
-## 方向
+## 兼容性与安装
 
-- 作为单独安装、默认不启用的 Bundle 交付；不修改 DSH 官方插件，也不注册或覆盖 `llm-pi-ai` 的 `openai-codex` 路由。对外路由为 `codex-subscription`，凭据记录仅属于 `dsh-openai-subscription/codex`。
-- 由插件自己的 Host、Remote 和 Client 组成；Client 通过 `settings.section` 在 DSH 原有设置窗口新增 OpenAI / Codex 页面。Web 与官方 Desktop 共用页面，但分别安装到其各自的 profile。
-- 优先复用 pi-ai 的 Codex 授权与模型请求实现，同时使用 DSH 的授权、凭据和 `LlmAdapter` 接口；不读取、复制或刷新 Codex CLI 的私有登录文件。access token、refresh token、授权码和 loopback 回调 URL 均不经 Client Remote。
-- 启动时的预备登录检测只进行不破坏性的 pi-ai 模型可用性检查；失败不会删除原有凭据。已登录才注册模型路由，登出或不可用检查会撤销它。
-- 订阅额度与每次模型调用的 token 用量分开处理。窗口、套餐和重置时间以服务端返回为准；额度接口尚未验证或实现。
+- 仅按 [兼容性基线](docs/COMPATIBILITY_BASELINE.md)中的 DSH `0.1.7-rc.2`（提交 `477b4f420553e8a52c2fbccc464d7561b239c443`）、Node 与已打补丁的 `@earendil-works/pi-ai@0.85.1` 开发。需要一个能运行 `dsh` 和 `pnpm` 的 DSH 安装；其他版本没有验证，不建议使用版本豁免强行启用。
+- 本地构建需要与仓库同级的 `../deepseek-harness` 检出，以满足 `package.json` 中的开发依赖链接。这些源码链接**不是**安装到用户 profile 的方式。
+- 当前只建议在 **Web profile** 安装和验证；官方 Desktop 的独立 profile、窗口和系统浏览器授权尚未实测，Headless/TUI 不是此设置页的支持范围。
 
-## 本地开发检查
+在插件仓库根目录构建并打包：
 
-本仓库的开发依赖指向同级的 `../deepseek-harness` 检出，且仅适配[兼容性基线](docs/COMPATIBILITY_BASELINE.md)记录的版本。`@earendil-works/pi-ai` 是锁定版本的 peer，运行时由 DSH 的已验证安装提供，避免外部 Bundle 另装一个不兼容的 pi-ai 副本：
-
-```bash
+```sh
 pnpm install --ignore-scripts
 pnpm typecheck
 pnpm test
-pnpm build
-npm pack --dry-run
+pnpm test:package
+npm pack --pack-destination /tmp/opencode
 ```
 
-构建产物包含 DSH Client 的 `__ModuleLoader__` factory 与外部包自有的 Typert Host/Remote 清单。使用 `npm pack` 得到的包可用于后续 DSH profile/Plugins 安装测试；在进行该测试前应先使用与基线相同提交的**干净** DSH 检出。
+然后通过 DSH 的 profile 插件命令安装刚生成的 tarball（先核对实际文件名；当前版本的文件名如下）：
 
-## 当前限制
+```sh
+dsh plugin --profile web add /tmp/opencode/h2mzzz-dsh-openai-subscription-0.0.0.tgz
+```
 
-- 首版仅处理文本和普通工具调用；图像、deferred tools、stop sequences 与 reasoning-effort 控制会明确拒绝，避免静默降级。
-- 浏览器 OAuth 使用 Host 本机 loopback。pi-ai 的手动回填输入不会显示在插件页面，因此不会要求用户把授权码或完整 callback URL 发送给 Client；device-code 线路仍需真实环境验证。
-- 真实授权、刷新、模型调用、工具调用续轮、取消、Web/Desktop profile 组合及额度来源均待用户在本机账户上授权后验证。请勿向聊天、日志、仓库或截图提供任何登录材料。
+DSH 会根据包内 `dsh.bundle.patch` / `cordis.patch.yml` 把 Host 和 Client 入口加入该 profile；它不是直接启动的 Node 应用。**安装或更新 Bundle 后，由你自行重启 Web profile 并刷新页面**，再在设置窗口的 OpenAI 页面登录；不要把服务端的回调 URL、授权码、令牌或整个授权错误页发给其他人。浏览器登录只适合浏览器与 DSH Host 在同一台机器的情形；设备代码方式存在于依赖实现中，但服务端是否对账号开放仍待实测。
 
-[实施计划](docs/IMPLEMENTATION_PLAN.md)列出完整的架构选择、额度来源待验证点和阶段验收标准。在完成验证关口前，不承诺单次授权可同时驱动模型请求、额度读取和 reset 卡操作。
+已安装旧的无 scope 包 `dsh-openai-subscription` 时，先在**停用该 profile 的维护窗口**执行 `dsh plugin --profile web remove dsh-openai-subscription`，再添加上述新包并由你自行重启。不要让新旧包同时加载：它们共享路由与凭据键。改名**不会**迁移或删除已有插件凭据；但真实的跨包升级、重启恢复仍待验证。本文不要求自动退出登录，也不修改你正在运行的 Web 服务。
 
-开发时先读 [AGENTS.md](AGENTS.md)；与设置页、异步测试和演示录制有关的上游技能副本集中在 [`.agents/`](.agents/README.md)。这些是开发参考，不能代替对目标 DSH 版本的实测。
+### 默认模型
 
-## 参考
+插件提供模型路由 `codex-subscription`，不全局修改 DSH 的 `agent-default-model`。若希望该 Web profile 的新会话默认使用 `gpt-5.6-terra`、Medium 思考强度，可在该 profile 的 `cordis.patch.yml` 里为**现有** `agent-default-model` 条目设置（与其他条目合并，不要替换整个文件）：
 
-- [DSH `LlmAdapter` 与模型目录](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/llm/llm/src/index.ts)
-- [DSH 设置页面扩展位](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-settings/src/client/contract/slots.ts)
-- [Codex App Server 账户与额度接口](https://developers.openai.com/codex/app-server#authentication-and-account-apis)
-- [V1ki/dsh-plugin-subscriptions](https://github.com/V1ki/dsh-plugin-subscriptions)：独立设置页和订阅额度展示的生态参考；本项目不复制其多提供商、账户池和附加工具范围。
+```yml
+- id: agent-default-model
+  name: "@deepseek-ai/dsh-agent-default-model"
+  config:
+    provider: codex-subscription
+    model: gpt-5.6-terra
+    reasoningEffort: medium
+```
 
-本仓库是独立社区项目，不代表 DeepSeek 或 OpenAI 的官方插件或背书。
+本机 Web profile 已使用这三个值；包本身不会覆盖其他用户的 profile 或已有会话的模型选择。模型必须在登录后出现在目录中才可选；是否有服务端使用权限仍以真实请求为准。插件对其当前支持 Medium 的 Codex 型号也报告 Medium 为**思考强度默认值**，明确选择其他强度时以选择值为准。
+
+## 功能与边界
+
+- **独立身份：** npm 包名是 `@h2mzzz/dsh-openai-subscription`（npm 不接受含大写字母的 `@H2MZZZ` 作为新包 scope）；展示名是 OpenAI，但 DSH 路由 ID 仍为 `codex-subscription`，不会占用官方的 `openai` / `openai-codex` 路由。凭据作用域仍为 `dsh-openai-subscription`、记录 ID 为 `codex`，改名不改变已有记录或其他插件的凭据。
+- **授权：** 设置页的「登录」展开浏览器登录和设备代码登录；Host 持有 OAuth state、授权回调、令牌、轮换与凭据写入。浏览器点击时打开新标签；loopback 页面显示“完成”只表示回调已收到，**不**证明凭据已经保存或模型可用。登录状态由 Host 自动同步；取消与退出仅作用于本插件的授权尝试/凭据。设备代码以及远程浏览器后备流程尚未用真实账号验证，不保证可用。
+- **模型：** 列表是锁定的 pi-ai `openai-codex` **静态目录**，并非实时抓取账号的可用型号。当前目录有 `gpt-5.6-terra`、`gpt-5.6-sol`、`gpt-5.6-luna`、`gpt-6-astra` 等；**没有** `gpt-6-sol` 和 `gpt-6-luna`。目前只能确定依赖目录缺少它们，不能断言是因为“太新”或账号权限，也不会凭空添加未核实的型号。
+- **思考强度：** 通过 DSH 原有模型选择器显示各型号实际可发送的 Low、Medium、High、Extra high，明确支持时再显示 Max。当前目录的 Minimal 映射到 Low，故不重复提供；“关闭”仅省略参数，不能保证关闭服务端默认，因此不展示。不支持的档位直接拒绝而不静默改档。此处仅有模拟请求验证，真实响应尚未确认。
+- **请求范围：** 首版支持文本和常规工具调用；图像、deferred tools 与 stop sequences 不提供有效支持，不应假设它们可用。插件不以 `OPENAI_API_KEY` 或其他插件/Codex CLI 的登录做后备。
+- **额度：** 订阅窗口、重置时间和 reset 卡尚未实现；一次请求的 token 用量**不是**订阅额度。没有服务端数值就不能显示为零，也没有消耗 reset 卡的功能。
+- **停用与退出：** 移除 Bundle 不等于退出登录；设置页「退出登录」才会删除本插件自己的记录。不要把凭据、完整 callback URL 或真实授权响应写入仓库、日志、截图或问题报告。
+
+## 开发与验证状态
+
+`pnpm typecheck`、`pnpm test`、`pnpm test:package` 包括 Host/Client 类型检查、模拟授权/适配器测试及构建后的 Client 激活检查；**这些检查不能替代**真实 Loader/profile 组合、真实授权/模型调用、Desktop 测试或额度接口验证。更详细的实施和验收边界见[实施计划](docs/IMPLEMENTATION_PLAN.md)。
+
+开发时先读 [AGENTS.md](AGENTS.md)。本仓库的 `.agents/` 仅提供开发参考。更多接口背景：[DSH 插件管理说明](https://github.com/deepseek-ai/deepseek-harness/blob/477b4f420553e8a52c2fbccc464d7561b239c443/apps/cli/reference/README.zh.md)、[DSH 设置槽位](https://github.com/deepseek-ai/deepseek-harness/blob/477b4f420553e8a52c2fbccc464d7561b239c443/packages/client/ui-settings/src/client/contract/slots.ts)、[Codex App Server 账户接口](https://developers.openai.com/codex/app-server#authentication-and-account-apis)。

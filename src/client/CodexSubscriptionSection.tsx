@@ -1,17 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { CodexSubscriptionState } from '../types.ts'
+import type { CodexLoginMethod, CodexSubscriptionState } from '../types.ts'
 import type { en } from './locales.ts'
 import css from './CodexSubscriptionSection.module.css'
 
 /** Browser-facing Host calls for the Codex settings page. */
 export interface CodexSubscriptionOperations {
   getState(): Promise<CodexSubscriptionState>
-  beginLogin(): Promise<CodexSubscriptionState>
+  beginLogin(method: CodexLoginMethod): Promise<CodexSubscriptionState>
   cancelLogin(attemptId: string): Promise<CodexSubscriptionState>
-  answerChoice(attemptId: string, answer: string): Promise<CodexSubscriptionState>
-  refreshLogin(): Promise<CodexSubscriptionState>
   signOut(): Promise<CodexSubscriptionState>
 }
 
@@ -40,24 +39,66 @@ function dotState(state: CodexSubscriptionState): 'done' | 'ongoing' | 'error' |
 /** Render the token-free ChatGPT sign-in and Codex availability surface. */
 export function CodexSubscriptionSection({ t, useState: useCodexState, operations }: CodexSubscriptionSectionProps) {
   const state = useCodexState(value => value)
-  const [answer, setAnswer] = useState('')
   const [copied, setCopied] = useState(false)
+  const [methodsExpanded, setMethodsExpanded] = useState(false)
+  const pendingBrowserTab = useRef<Window | null>(null)
   const busy = state.status === 'signing-in' || state.status === 'checking'
+  const canSignIn = state.status === 'signed-out' || state.status === 'error'
   const label = state.status === 'signed-in' ? t('signedIn')
     : state.status === 'signing-in' ? t('signingIn')
       : state.status === 'checking' ? t('checking')
         : state.status === 'error' ? t('error') : t('signedOut')
   const error = state.error === 'login-failed' ? t('loginFailed')
+    : state.error === 'login-timeout' ? t('loginTimeout')
     : state.error === 'saved-login-unavailable' ? t('savedLoginUnavailable') : undefined
 
   useEffect(() => {
-    setAnswer('')
     setCopied(false)
-  }, [state.prompt, state.notice?.url])
+  }, [state.notice?.url])
 
-  const submit = async (): Promise<void> => {
-    if (state.attemptId === undefined || answer.length === 0) return
-    await operations.answerChoice(state.attemptId, answer)
+  useEffect(() => {
+    const tab = pendingBrowserTab.current
+    if (tab === null) return
+    if (state.status === 'signing-in' && state.method === 'browser' && state.notice?.url !== undefined) {
+      pendingBrowserTab.current = null
+      try {
+        if (!tab.closed) tab.location.replace(state.notice.url)
+      } catch {
+        tab.close() // The visible link below remains available when popup navigation fails.
+      }
+    } else if (state.status === 'error' || state.status === 'signed-in'
+      || (state.status === 'signing-in' && state.method !== 'browser')) {
+      pendingBrowserTab.current = null
+      tab.close()
+    }
+  }, [state.status, state.method, state.notice?.url])
+
+  useEffect(() => () => { pendingBrowserTab.current?.close() }, [])
+
+  const beginBrowserLogin = (): void => {
+    setMethodsExpanded(false)
+    // Open during the user's click: an asynchronously returned URL would be
+    // blocked as a popup by many browsers. The manual link remains a fallback.
+    const tab = window.open('about:blank', '_blank')
+    if (tab !== null) tab.opener = null
+    pendingBrowserTab.current = tab
+    void operations.beginLogin('browser').catch(() => {
+      if (pendingBrowserTab.current === tab) {
+        pendingBrowserTab.current = null
+        tab?.close()
+      }
+    })
+  }
+
+  const cancel = (attemptId: string): void => {
+    pendingBrowserTab.current?.close()
+    pendingBrowserTab.current = null
+    void operations.cancelLogin(attemptId)
+  }
+
+  const beginDeviceLogin = (): void => {
+    setMethodsExpanded(false)
+    void operations.beginLogin('device_code')
   }
 
   return (
@@ -67,14 +108,29 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
         <p className={css.intro}>{t('intro')}</p>
       </div>
       <div className={css.card}>
-        <div className={css.status}>
-          <StateDot state={dotState(state)} />
-          <span>{label}</span>
+        <div className={css.cardHeader}>
+          <div className={css.status}>
+            <StateDot state={dotState(state)} />
+            <span>{label}</span>
+          </div>
+          <div className={css.headerActions}>
+            {state.status === 'signing-in' && state.attemptId !== undefined ? (
+              <Button variant="outline" size="sm" onClick={() => { cancel(state.attemptId!) }}>{t('cancel')}</Button>
+            ) : state.status === 'signed-in' ? (
+              <Button variant="ghost" size="sm" onClick={() => { void operations.signOut() }}>{t('signOut')}</Button>
+            ) : canSignIn ? (
+              <Button variant="primary" size="sm" aria-expanded={methodsExpanded} aria-controls="codex-subscription-methods"
+                onClick={() => { setMethodsExpanded(expanded => !expanded) }}>
+                {methodsExpanded ? t('hideMethods') : t('showMethods')}
+              </Button>
+            ) : null}
+          </div>
         </div>
         {error !== undefined && <p className={css.error} role="status">{error}</p>}
         {state.notice !== undefined && (
           <div className={css.notice}>
-            <p>{state.notice.message}</p>
+            <p>{state.notice.kind === 'browser' ? t('browserNotice')
+              : state.notice.kind === 'device_code' ? t('deviceNotice') : t('progressNotice')}</p>
             {state.notice.code !== undefined && <code className={css.code}>{state.notice.code}</code>}
             {state.notice.url !== undefined && (
               <div className={css.actions}>
@@ -90,32 +146,18 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
             )}
           </div>
         )}
-        {state.prompt !== undefined && state.attemptId !== undefined && (
-          <form className={css.prompt} onSubmit={(event) => { event.preventDefault(); void submit() }}>
-            <label htmlFor="codex-subscription-answer">{t('selectMethod')}</label>
-            <select id="codex-subscription-answer" value={answer} onChange={event => { setAnswer(event.target.value) }}>
-              <option value="">{t('selectMethod')}</option>
-              {state.prompt.options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
-            </select>
-            <Button variant="primary" size="sm" disabled={answer.length === 0}>{t('promptAnswer')}</Button>
-          </form>
+        {canSignIn && methodsExpanded && (
+          <div id="codex-subscription-methods" className={css.methodList}>
+            <div className={css.method}>
+              <span>{t('browserDescription')}</span>
+              <Button className={css.methodButton} variant="primary" size="sm" onClick={beginBrowserLogin}>{t('browserSignIn')}</Button>
+            </div>
+            <div className={css.method}>
+              <span>{t('deviceDescription')}</span>
+              <Button className={css.methodButton} variant="outline" size="sm" onClick={beginDeviceLogin}>{t('deviceSignIn')}</Button>
+            </div>
+          </div>
         )}
-        <p className={css.safeNotice}>{t('safeNotice')}</p>
-        <div className={css.actions}>
-          {state.status === 'signing-in' && state.attemptId !== undefined ? (
-            <Button variant="outline" onClick={() => { void operations.cancelLogin(state.attemptId!) }}>{t('cancel')}</Button>
-          ) : state.status === 'signed-in' ? (
-            <>
-              <Button variant="outline" disabled={busy} onClick={() => { void operations.refreshLogin() }}>{t('refresh')}</Button>
-              <Button variant="ghost" disabled={busy} onClick={() => { void operations.signOut() }}>{t('signOut')}</Button>
-            </>
-          ) : (
-            <>
-              <Button variant="primary" disabled={busy} onClick={() => { void operations.beginLogin() }}>{t('signIn')}</Button>
-              <Button variant="outline" disabled={busy} onClick={() => { void operations.refreshLogin() }}>{t('refresh')}</Button>
-            </>
-          )}
-        </div>
       </div>
       <div>
         <h3 className={css.modelsTitle}>{t('models')}</h3>

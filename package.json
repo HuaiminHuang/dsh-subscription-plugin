@@ -1,5 +1,5 @@
 {
-  "name": "dsh-openai-subscription",
+  "name": "@h2mzzz/dsh-openai-subscription",
   "version": "0.0.0",
   "description": "Opt-in ChatGPT Codex subscription provider for DeepSeek Harness",
   "private": true,
@@ -58,8 +58,7 @@
         "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-settings"
-      ],
-      "external": ["@deepseek-ai/dsh-client-ui-primitives"]
+      ]
     }
   },
   "dependencies": {

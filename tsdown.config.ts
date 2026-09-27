@@ -4,7 +4,7 @@ import { defineConfig } from 'tsdown'
 import { transform } from 'lightningcss'
 import { typertPlugin } from '@deepseek-ai/dsh-typert-generator/tsdown'
 
-const PACKAGE_ID = 'dsh-openai-subscription'
+const PACKAGE_ID = '@h2mzzz/dsh-openai-subscription'
 const clientExternals = new Set(['react', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'])
 const CSS_PREFIX = '\0dsh-openai-subscription-css:'
 

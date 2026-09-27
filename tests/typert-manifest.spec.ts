@@ -4,11 +4,11 @@ import { TYPERT } from '../src/typert.host.ts'
 
 describe('Typert Host manifest', () => {
   it('is accepted by the target DSH loader and exposes only the Codex namespace', () => {
-    const manifest = validateTypertManifest('dsh-openai-subscription', TYPERT)
+    const manifest = validateTypertManifest('@h2mzzz/dsh-openai-subscription', TYPERT)
     expect(manifest.face).toBe('host')
-    expect(manifest.invocations.map(item => item.namespace)).toEqual([
-      'codexSubscription', 'codexSubscription', 'codexSubscription', 'codexSubscription',
-      'codexSubscription', 'codexSubscription', 'codexSubscription',
+    expect(manifest.invocations.map(item => item.method)).toEqual([
+      'getState', 'beginLogin', 'cancelLogin', 'signOut', 'watch',
     ])
+    expect(manifest.invocations.every(item => item.namespace === 'codexSubscription')).toBe(true)
   })
 })
