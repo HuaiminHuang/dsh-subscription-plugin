@@ -52,18 +52,36 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     refreshLogin: () => call(() => ctx.remote.codexSubscription.refreshLogin()),
     signOut: () => call(() => ctx.remote.codexSubscription.signOut()),
   }
-  try { await operations.getState() } catch (error) {
-    disposeStyles()
-    await disposeRemote()
-    throw error
-  }
-  const stream = ctx.remote.codexSubscription.watch()
-  const watching = (async () => {
-    try { for await (const item of stream) store.set(item) } catch { /* connection resets retain the latest safe view */ }
-  })()
   const ui = ctx.inject(['slots', 'locale'], (child) => {
     const t = child.locale.bind('settings.codexSubscription')
     child.effect(() => child.locale.register('settings.codexSubscription', { en, zh }))
+    child.effect(() => {
+      let stream: ReturnType<typeof ctx.remote.codexSubscription.watch> | undefined
+      let watching: Promise<void> | undefined
+      const synchronize = (): void => {
+        // Client transport starts after Loader activation. These calls are
+        // intentionally detached so a disconnected Host never fails this
+        // package's Client entry; connection/reset invokes them again.
+        void operations.getState().catch(() => {})
+        stream?.dispose()
+        stream = ctx.remote.codexSubscription.watch()
+        const current = stream
+        watching = (async () => {
+          try {
+            for await (const item of current) {
+              if (stream === current) store.set(item)
+            }
+          } catch { /* connection resets retain the latest safe view */ }
+        })()
+      }
+      const disposeReset = child.on('connection/reset', synchronize)
+      synchronize()
+      return async () => {
+        disposeReset()
+        stream?.dispose()
+        await watching
+      }
+    }, 'codex-subscription: safe state synchronization')
     child.slots.inject('settings.section', () => child.slots.register({
       name: 'settings.section', id: 'codex-subscription', order: 12, label: () => t('nav'),
       locale: 'settings.codexSubscription', inject: () => ({ operations, hooks: { state: store } }),
@@ -71,16 +89,12 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   })
   try { await ui } catch (error) {
     await ui.dispose()
-    stream.dispose()
-    await watching
     disposeStyles()
     await disposeRemote()
     throw error
   }
   return async () => {
     await ui.dispose()
-    stream.dispose()
-    await watching
     disposeStyles()
     await disposeRemote()
   }
