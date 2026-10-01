@@ -1,0 +1,43 @@
+.trigger { display: flex; min-width: 0; max-width: 220px; height: 28px; align-items: center; gap: 6px; border: 0; background: transparent; color: var(--dsw-alias-label-primary); font-size: 13px; cursor: pointer; }
+.trigger span { color: var(--dsw-alias-label-secondary); }
+.fastIndicator { width: 16px; height: 16px; flex-shrink: 0; color: var(--dsw-alias-label-primary); }
+.panel, .modelPopup { width: min(240px, calc(100vw - 16px)); box-sizing: border-box; color: var(--dsw-alias-label-primary); border-radius: var(--dsw-radius-xl); }
+.panel { max-height: calc(100vh - 16px); overflow: auto; padding: 8px 10px 12px; z-index: 1000; }
+.header { display: grid; grid-template-columns: 24px minmax(0, 1fr) 24px; align-items: center; }
+.icon { display: grid; place-items: center; width: 24px; height: 24px; padding: 3px; border: 0; border-radius: var(--dsw-radius-md); background: transparent; color: var(--dsw-alias-label-secondary); font-size: 18px; cursor: pointer; }
+.icon svg { width: 18px; height: 18px; }
+.icon .lightning { width: 20px; height: 20px; }
+.icon[aria-pressed='true'], .effort { color: var(--dsw-alias-state-business-primary); }
+.effort { text-align: center; font-size: 13px; font-weight: 500; }
+.model, .option, .row { border: 0; border-radius: var(--dsw-radius-md); background: transparent; color: var(--dsw-alias-label-primary); font: inherit; font-size: 13px; cursor: pointer; }
+.model { width: 100%; padding: 2px 4px 8px; text-align: center; color: var(--dsw-alias-label-secondary); }
+.slider { position: relative; margin: 6px 0 0; height: 26px; display: flex; align-items: center; }
+.slider input { appearance: none; -webkit-appearance: none; width: 100%; height: 22px; margin: 0; border: 0; border-radius: 999px; cursor: pointer; }
+.slider input::-webkit-slider-runnable-track { height: 22px; border-radius: 999px; }
+.slider input::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; position: relative; z-index: 1; height: 26px; width: 26px; margin-top: -2px; border: 0; border-radius: 50%; background: var(--dsw-static-neutral-00, #fff); }
+.slider input::-moz-range-track { height: 22px; border-radius: 999px; background: transparent; }
+.slider input::-moz-range-thumb { height: 26px; width: 26px; border: 0; border-radius: 50%; background: var(--dsw-static-neutral-00, #fff); }
+.slider input:disabled { cursor: default; }
+.ticks { position: absolute; left: 13px; right: 13px; top: 50%; pointer-events: none; }
+.ticks i { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: var(--dsw-alias-label-secondary); opacity: .55; transform: translate(-50%, -50%); }
+.classic { width: min(280px, calc(100vw - 16px)); padding: 4px; }
+.row { display: flex; width: 100%; min-height: 36px; box-sizing: border-box; align-items: center; gap: 8px; padding: 6px 8px; text-align: left; }
+.value { margin-left: auto; color: var(--dsw-alias-label-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.switch { flex-shrink: 0; width: 34px; height: 20px; padding: 2px; border: 0; border-radius: 999px; background: var(--dsw-alias-bg-module-platform); cursor: pointer; }
+.switch i { display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--dsw-static-neutral-00, #fff); transition: transform .12s; }
+.switch[aria-checked='true'] { background: var(--dsw-alias-state-business-primary); }
+.switch[aria-checked='true'] i { transform: translateX(14px); }
+.modelPopup { max-height: min(360px, calc(100vh - 16px)); overflow-y: auto; padding: 4px; }
+.group { padding: 6px 8px; font-size: 12px; color: var(--dsw-alias-label-secondary); }
+.option { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; text-align: left; }
+.option[aria-checked='true'], .option:hover, button.row:hover, .model:hover, .icon:hover { background: var(--dsw-alias-bg-module-platform); }
+.hint, .error { margin: 6px 0; font-size: 13px; line-height: 20px; }
+.error { color: var(--dsw-alias-state-error-primary); }
+.panel button:disabled, .modelPopup button:disabled { cursor: default; opacity: .5; }
+.panel button:focus-visible, .modelPopup button:focus-visible, .trigger:focus-visible, .slider input:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
+
+.caption { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Saving blocks repeated actions without dimming the whole compact control. */
+.panel[data-saving="true"] .icon:disabled, .panel[data-saving="true"] .model:disabled { opacity: 1; }

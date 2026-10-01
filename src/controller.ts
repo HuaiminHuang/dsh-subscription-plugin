@@ -1,3 +1,5 @@
+import { supportsFast } from './speed.ts'
+import type { CodexSpeedState } from './types.ts'
 import { randomUUID } from 'node:crypto'
 import { Context } from '@deepseek-ai/cordis'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
@@ -37,11 +39,13 @@ export class CodexSubscriptionController extends TypertRemoteService {
 
   readonly models: MutableModels
   private readonly adapter: CodexSubscriptionAdapter
+  private compactModelControl = false
+  private readonly fastSelections = new Set<string>()
   private readonly activeRequests = new Set<ActiveRequest>()
   private registration: AdapterRegistrationHandle | undefined
   private attempt: Attempt | undefined
   private readonly instanceId = randomUUID()
-  private state: CodexSubscriptionState = { status: 'checking', models: [], instanceId: this.instanceId, revision: 0 }
+  private state: CodexSubscriptionState = { status: 'checking', models: [], compactModelControl: false, instanceId: this.instanceId, revision: 0 }
   private revision = 0
   private readonly listeners = new Set<() => void>()
   private readonly pendingRefreshes = new Set<Promise<void>>()
@@ -123,6 +127,12 @@ export class CodexSubscriptionController extends TypertRemoteService {
     return result
   }
 
+  /** Owned by the optional compact-control Loader entry, never a Remote setting. */
+  setCompactModelControl(enabled: boolean): void {
+    this.compactModelControl = enabled
+    this.publish(this.state)
+  }
+
   /** Read safe login state; this never returns a credential, token, or callback URL. */
   @Remote
   getState(): CodexSubscriptionState { return this.state }
@@ -201,6 +211,44 @@ export class CodexSubscriptionController extends TypertRemoteService {
     return this.state
   }
 
+  /** Read the speed choice owned by this Host lifetime, session, and exact model. */
+  @Remote
+  getSpeed(sessionId: string, model: string): CodexSpeedState {
+    this.assertSpeedKey(sessionId, model)
+    const supported = this.availableModels().some(candidate => candidate.id === model) && supportsFast(model)
+    return { enabled: supported && this.fastSelections.has(`${sessionId}:${model}`), supported }
+  }
+
+  /** Request Fast independently of the saved model and reasoning selection. */
+  @Remote
+  setSpeed(sessionId: string, model: string, enabled: boolean): CodexSpeedState {
+    this.assertSpeedKey(sessionId, model)
+    if (typeof enabled !== 'boolean' || this.disposed || this.signOutTask !== undefined
+      || this.state.status !== 'signed-in') throw new LlmError('Speed selection is unavailable', 'UNSUPPORTED_OPTION')
+    const current = this.getSpeed(sessionId, model)
+    if (enabled && !current.supported) throw new LlmError('This model cannot request Fast', 'UNSUPPORTED_OPTION')
+    const key = `${sessionId}:${model}`
+    if (enabled) {
+      if (this.fastSelections.size >= 1024 && !this.fastSelections.has(key)) {
+        throw new LlmError('Too many speed selections', 'UNSUPPORTED_OPTION')
+      }
+      this.fastSelections.add(key)
+    } else this.fastSelections.delete(key)
+    return this.getSpeed(sessionId, model)
+  }
+
+  /** Capture the request mode; auxiliary and unscoped calls retain Standard. */
+  requestFast(sessionId: string | undefined, model: string): boolean {
+    return sessionId !== undefined && supportsFast(model) && this.fastSelections.has(`${sessionId}:${model}`)
+  }
+
+  private assertSpeedKey(sessionId: string, model: string): void {
+    if (typeof sessionId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(sessionId)
+      || typeof model !== 'string' || !/^[a-zA-Z0-9._-]{1,128}$/.test(model)) {
+      throw new LlmError('Invalid speed selection', 'UNSUPPORTED_OPTION')
+    }
+  }
+
   /** Re-fetch the model catalog while retaining the current list on failure. */
   @Remote
   async refreshModels(): Promise<CodexSubscriptionState> {
@@ -246,6 +294,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
     if (this.disposed) return this.state
     await this.ctx.credentials.deleteRecord(CODEX_CREDENTIAL_KEY)
     if (this.disposed) return this.state
+    this.fastSelections.clear()
     this.registration?.replace([])
     this.publish({ status: 'signed-out', models: [], checkedAt: new Date().toISOString() })
     return this.state
@@ -454,12 +503,13 @@ export class CodexSubscriptionController extends TypertRemoteService {
   private publish(next: CodexSubscriptionState): void {
     if (this.disposed) return
     this.revision++
-    this.state = Object.freeze({ ...next, instanceId: this.instanceId, revision: this.revision })
+    this.state = Object.freeze({ ...next, compactModelControl: this.compactModelControl, instanceId: this.instanceId, revision: this.revision })
     for (const listener of this.listeners) listener()
   }
 
   private async dispose(): Promise<void> {
     this.disposed = true
+    this.fastSelections.clear()
     this.refreshEpoch++
     if (this.attempt !== undefined) {
       clearTimeout(this.attempt.timer)

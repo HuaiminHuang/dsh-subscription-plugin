@@ -5,6 +5,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-tool/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { ModelControl } from './ModelControl.tsx'
+import { modelEn, modelZh } from './model-locales.ts'
+import { install as installModelStyles } from './ModelControl.module.css'
 import type { Context } from '@deepseek-ai/cordis'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type { CodexSubscriptionState } from '../types.ts'
@@ -46,6 +51,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const disposeRemote = await ctx.remote.$mount(remote)
   const disposeStyles = installStyles()
   const disposeImageStyles = installImageStyles()
+  const disposeModelStyles = installModelStyles()
   const imageView = ctx.inject(['slots', 'locale'], child => {
     child.effect(() => child.locale.register('tool.codexImage', { en: imageEn, zh: imageZh }))
     child.slots.inject('tool.call.toolview', () => child.slots.register({
@@ -103,7 +109,27 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
       locale: 'settings.codexSubscription', inject: () => ({ operations, hooks: { state: store } }),
     }, CodexSubscriptionSection))
   })
+  const modelUi = ctx.inject(['modelDirectories', 'sessions', 'slots', 'locale', 'remote', 'remote.session', 'remote.codexSubscription'], child => {
+    child.effect(() => child.locale.register('codex.model', { en: modelEn, zh: modelZh }))
+    child.slots.inject('conversation.input.model', () => child.slots.register({
+      name: 'conversation.input.model', locale: 'codex.model', priority: -10,
+      inject: sessionId => {
+        const directory = child.modelDirectories.directoryFor(sessionId)
+        const available = child.sessions.subagentAddress(sessionId) === undefined
+        return {
+          available, directory: directory.store, controls: store,
+          load: () => { if (available) void directory.load().catch(() => {}) },
+          select: selection => available ? directory.select(selection) : Promise.resolve(undefined),
+          getSpeed: async (model: string) => result(await child.remote.codexSubscription.getSpeed(String(sessionId), model)),
+          setSpeed: async (model: string, enabled: boolean) => result(await child.remote.codexSubscription.setSpeed(String(sessionId), model, enabled)),
+        }
+      },
+    }, ModelControl))
+  })
+  void Promise.resolve(modelUi).catch(() => { /* Optional model owner must not break settings. */ })
   try { await ui } catch (error) {
+    await modelUi.dispose()
+    disposeModelStyles()
     await ui.dispose()
     await imageView.dispose()
     disposeImageStyles()
@@ -112,6 +138,8 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     throw error
   }
   return async () => {
+    await modelUi.dispose()
+    disposeModelStyles()
     await ui.dispose()
     await imageView.dispose()
     disposeImageStyles()

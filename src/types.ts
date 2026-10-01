@@ -17,5 +17,14 @@ export interface CodexSubscriptionState {
   readonly models: readonly { readonly id: string; readonly name: string }[]
   /** Stable, non-provider error category; presentation stays in Client locales. */
   readonly error?: 'login-failed' | 'login-timeout' | 'saved-login-unavailable'
+  /** Whether the independently switchable compact model UI row is mounted. */
+  readonly compactModelControl?: boolean
   readonly checkedAt?: string
+}
+
+/** Host-owned, per-session and per-model speed choice; reset when the Host unloads. */
+export interface CodexSpeedState {
+  readonly enabled: boolean
+  /** Model can request Fast; this does not assert account entitlement. */
+  readonly supported: boolean
 }

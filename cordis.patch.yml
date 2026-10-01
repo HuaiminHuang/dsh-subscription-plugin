@@ -4,3 +4,5 @@
       name: "@h2mzzz/dsh-openai-subscription"
     - id: openai-subscription-imagegen
       name: "@h2mzzz/dsh-openai-subscription/imagegen"
+    - id: openai-subscription-model-control
+      name: "@h2mzzz/dsh-openai-subscription/model-control"

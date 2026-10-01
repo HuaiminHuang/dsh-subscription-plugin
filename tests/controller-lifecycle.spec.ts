@@ -28,6 +28,7 @@ function controller(overrides: Record<string, unknown> = {}): CodexSubscriptionC
     },
     models: { getAvailable: async () => [] },
     adapter: {},
+    fastSelections: new Set(),
     activeRequests: new Set(),
     registration: undefined,
     attempt: undefined,

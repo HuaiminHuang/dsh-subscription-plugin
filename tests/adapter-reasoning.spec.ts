@@ -12,6 +12,7 @@ const catalog = openaiCodexProvider().getModels()
 function fixture() {
   const calls: unknown[] = []
   const controller = {
+    requestFast: () => false,
     availableModels: () => catalog,
     openRequest: () => ({ signal: new AbortController().signal, [Symbol.dispose]() {} }),
     models: {

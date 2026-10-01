@@ -58,6 +58,7 @@ export default defineConfig([
     entry: {
       index: 'src/index.ts',
       imagegen: 'src/imagegen-entry.ts',
+      'model-control': 'src/model-control-entry.ts',
       'typert.host': 'src/typert.host.ts',
       'typert.remote-client': 'src/remote.ts',
     },

@@ -1,3 +1,4 @@
+import { speedPayload } from './speed.ts'
 import { attributionHeaders, LlmAdapter, LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, LlmModelInfo, LlmModelReasoningInfo, LlmProviderInfo, LlmResolvedModelInfo, PreparedAdapterCall, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { getSupportedThinkingLevels } from '@earendil-works/pi-ai'
@@ -98,6 +99,7 @@ export class CodexSubscriptionAdapter extends LlmAdapter {
       ...options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens },
       ...options.sessionId === undefined ? {} : { sessionId: String(options.sessionId) },
       ...reasoning === undefined ? {} : { reasoning },
+      onPayload: speedPayload(options.purpose === undefined && this.controller.requestFast(options.sessionId === undefined ? undefined : String(options.sessionId), model.id)),
       headers: attributionHeaders(),
       maxRetries: 0,
     })
