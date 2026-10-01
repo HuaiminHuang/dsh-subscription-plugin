@@ -9,7 +9,7 @@ kind: "package-bundle"
 
 An independent, opt-in [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) plugin. It adds an **OpenAI** page to the existing settings window and provides its own `codex-subscription` model route for Codex. This is not an official DeepSeek or OpenAI plugin.
 
-> **Under development.** Type checks, mocked tests, built-package checks, and Host mount/unmount checks in an isolated Web profile have run on Ubuntu. Real ChatGPT authorization and model requests, full browser UI composition, and the Desktop client have not been validated. The package is `0.0.2` / `private`, distributed only as a GitHub Pre-release asset, not on npm.
+> **v0.1.0: first formal release.** Targets Ubuntu / Web on the pinned DSH baseline, with isolated subscription access, live model discovery, compact model controls, Fast mode, and native image-input bridging. Image generation and vision remain experimental; real-account vision, Desktop, quota, and reset cards are outside the verified scope. Distribution uses built `.tgz` assets; `private: true` is retained, so this package is not published to the npm registry. See the [v0.1.0 release notes](docs/RELEASE_NOTES_v0.1.0.md).
 
 ## Compatibility
 
@@ -24,10 +24,10 @@ Other DSH versions and platforms are unverified. Do not bypass compatibility che
 
 ## Installation
 
-Download the **built npm `.tgz` asset** from the [v0.0.2 Pre-release](https://github.com/HuaiminHuang/dsh-subscription-plugin/releases/tag/v0.0.2). The Web profile can install directly from its URL:
+A locally saved release can be installed with the absolute-path command below. After remote publication, download the **built npm `.tgz` asset** from the [v0.1.0 Release](https://github.com/HuaiminHuang/dsh-subscription-plugin/releases/tag/v0.1.0). The Web profile can install directly from its URL:
 
 ```sh
-dsh plugin --profile web add https://github.com/HuaiminHuang/dsh-subscription-plugin/releases/download/v0.0.2/h2mzzz-dsh-openai-subscription-0.0.2.tgz
+dsh plugin --profile web add https://github.com/HuaiminHuang/dsh-subscription-plugin/releases/download/v0.1.0/h2mzzz-dsh-openai-subscription-0.1.0.tgz
 ```
 
 Alternatively, build the package from this repository. The build requires a checkout of the targeted DSH version at `../deepseek-harness`:
@@ -38,10 +38,10 @@ pnpm test:package
 npm pack
 ```
 
-`npm pack` creates `h2mzzz-dsh-openai-subscription-0.0.2.tgz`. Install it in the Web profile using its actual **absolute path**:
+`npm pack` creates `h2mzzz-dsh-openai-subscription-0.1.0.tgz`. Install it in the Web profile using its actual **absolute path**:
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/h2mzzz-dsh-openai-subscription-0.0.2.tgz
+dsh plugin --profile web add /absolute/path/to/h2mzzz-dsh-openai-subscription-0.1.0.tgz
 ```
 
 On a Desktop installation matching the compatibility baseline, enter the `.tgz` asset URL above or a local absolute path accessible on the Desktop machine under **Plugins → Add plugin**, then enable it as prompted. **Do not** run `dsh plugin --profile desktop` or edit the Desktop profile by hand. Web and Desktop share UI code, not plugin dependencies or activation state: installing on Web does not install on Desktop. Desktop installation and login are still untested. The Git repository and GitHub-generated source archives do not include the required `lib/` files and are not installable bundles.
@@ -81,7 +81,7 @@ The display name is OpenAI, but the provider ID remains `codex-subscription`, an
 
 ## Known limitations and deferred work
 
-- The model route accepts text, ordinary tool calls, and user/tool-result images when the model catalog declares `image`. Host reads DSH attachments and converts them to native Codex image messages independently of the image-generation row. Preview budgets match DSH pi-ai: 2048×2048 pixels, a 1 MiB encoded target per image, and a 20 MiB Base64 request bound. Offloaded history remains text; oversized requests return the standard offload requirement. Attachment conversion and the actual pi-ai serializer are tested; real-account vision remains unverified. Deferred tools, system/assistant/developer images, and stop sequences are unsupported. The new experimental `codex_generate_image` is a separate Host tool, enabled with the Bundle by default. Use the independent **OpenAI Image Generation** row switch in the sidebar **Plugins** page; no `imageGen.enabled` setting is required. Its packaged Skill and tool register only when that row is enabled and signed in; disabling it preserves text login and model routing. Model-facing results are text; the plugin card reads images through an authenticated session-bound endpoint. This version accepts **native direct tool calls only**: nested PTC `run_code` dispatches are rejected rather than silently losing the image card. Loader/profile, browser UI and real-account end-to-end acceptance are **not yet complete**, and the v0.0.2 release artifact does not include this feature. Switching and registration have mocked and built-package evidence; real-account image generation still needs separate acceptance.
+- The model route accepts text, ordinary tool calls, and user/tool-result images when the model catalog declares `image`. Host reads DSH attachments and converts them to native Codex image messages independently of the image-generation row. Preview budgets match DSH pi-ai: 2048×2048 pixels, a 1 MiB encoded target per image, and a 20 MiB Base64 request bound. Offloaded history remains text; oversized requests return the standard offload requirement. Attachment conversion and the actual pi-ai serializer are tested; real-account vision remains unverified. Deferred tools, system/assistant/developer images, and stop sequences are unsupported. The new experimental `codex_generate_image` is a separate Host tool, enabled with the Bundle by default. Use the independent **OpenAI Image Generation** row switch in the sidebar **Plugins** page; no `imageGen.enabled` setting is required. Its packaged Skill and tool register only when that row is enabled and signed in; disabling it preserves text login and model routing. Model-facing results are text; the plugin card reads images through an authenticated session-bound endpoint. This version accepts **native direct tool calls only**: nested PTC `run_code` dispatches are rejected rather than silently losing the image card. Loader/profile, browser UI and real-account end-to-end acceptance are **not yet complete**, and this feature ships as experimental in v0.1.0. Switching and registration have mocked and built-package evidence; real-account image generation still needs separate acceptance.
 - Model calls, cancellation, and tool calls still lack real-account validation. Races between login-state refresh, sign-out, and unload have deterministic mocked tests but are not validated with a real account.
 - Subscription quota, reset times, and reset cards are not implemented. Token usage for one request is **not** subscription quota and cannot be used to estimate remaining allowance.
 - Desktop installation, window layout, and system-browser authorization have not been tested. Web mocks and build checks do not count as Desktop validation. Do not copy OAuth credential files between machines.

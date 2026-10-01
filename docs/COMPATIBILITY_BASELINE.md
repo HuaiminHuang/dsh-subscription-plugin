@@ -15,6 +15,12 @@
 
 ## 本机检出状态
 
-记录时该 DSH 工作树含两处未提交的 Desktop 构建相关修改：`apps/desktop/scripts/desktop-build-paths.mjs` 和 `tsconfig.desktop-keyboard-tests.json`。它们不在已核查的 Host、Client、凭据、授权或 LLM 接口路径中，但该工作树不是可复现的干净发行基线。
+v0.1.0 发行核对时，本机 DSH HEAD 仍为表中固定提交，工作树有五个未提交的 Desktop 构建相关文件：
 
-模型接入的真实 Web/Loader 测试可先以此检出执行。发布包和 Desktop 验收前，必须改用同一提交的干净检出，或将经过审查的差异另行固定并重新记录结果。
+- `apps/desktop/scripts/desktop-build-paths.d.mts`
+- `apps/desktop/scripts/desktop-build-paths.mjs`
+- `apps/desktop/scripts/development-project.ts`
+- `apps/desktop/tests/desktop-build-paths.spec.ts`
+- `tsconfig.desktop-keyboard-tests.json`
+
+这些差异不在本版核查的 Host、Loader、Client、附件、凭据、授权或 LLM 接口路径中；不重置用户工作，也不据此声明 Desktop 支持。v0.1.0 的插件产物从独立源码快照全新构建，复用固定参考 DSH 的已构建 Web/Host 依赖；不是 DSH 全仓重新构建的证明。该 tarball 在临时 Web profile 安装后，通过实际 profile 模块解析、Loader、ToolRuntime 与 SkillRegistry 完成挂载和卸载验证，认证/网络/存储使用合成依赖。完整 Desktop 验收仍需同一提交的干净检出与平台实测。

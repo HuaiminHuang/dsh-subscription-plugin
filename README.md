@@ -9,7 +9,7 @@ kind: "package-bundle"
 
 独立、可选的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）插件：在原有设置窗口增加 **OpenAI** 页面，通过插件专有的 `codex-subscription` 模型路由调用 Codex。它不是 DeepSeek 或 OpenAI 的官方插件。
 
-> **开发中。** 目前在 Ubuntu 上完成类型检查、模拟测试、构建包检查和隔离 Web profile 的 Host 装载/卸载检查；真实 ChatGPT 授权与模型请求、浏览器端完整 UI 组合及 Desktop 客户端均未完成验收。包为 `0.0.2` / `private`，仅作为 GitHub Pre-release 附件提供，尚未发布 npm 包。
+> **v0.1.0 首个正式版本。** 面向固定 DSH 基线的 Ubuntu / Web 使用，提供独立订阅接入、动态模型目录、模型滑块、快速模式和图片输入桥接。生图与原生识图保留实验能力标记，真实账号识图、Desktop、额度与 reset 卡不属于已验证范围。发行物为构建后的 `.tgz`；保留 `private: true`，不发布到 npm registry。验证范围见 [v0.1.0 发布说明](docs/RELEASE_NOTES_v0.1.0.md)。
 
 ## 兼容性
 
@@ -24,10 +24,10 @@ kind: "package-bundle"
 
 ## 安装
 
-从 [v0.0.2 Pre-release](https://github.com/HuaiminHuang/dsh-subscription-plugin/releases/tag/v0.0.2) 下载**构建后的 npm `.tgz` 附件**。Web profile 可直接使用该附件 URL：
+本地保存的发行包可按下方绝对路径命令安装；远端发布后，从 [v0.1.0 Release](https://github.com/HuaiminHuang/dsh-subscription-plugin/releases/tag/v0.1.0) 下载**构建后的 npm `.tgz` 附件**。Web profile 可直接使用该附件 URL：
 
 ```sh
-dsh plugin --profile web add https://github.com/HuaiminHuang/dsh-subscription-plugin/releases/download/v0.0.2/h2mzzz-dsh-openai-subscription-0.0.2.tgz
+dsh plugin --profile web add https://github.com/HuaiminHuang/dsh-subscription-plugin/releases/download/v0.1.0/h2mzzz-dsh-openai-subscription-0.1.0.tgz
 ```
 
 也可从本仓库自行构建：构建依赖需要同级目录中的目标版本 `../deepseek-harness` 检出。在插件仓库根目录运行：
@@ -38,10 +38,10 @@ pnpm test:package
 npm pack
 ```
 
-`npm pack` 会生成 `h2mzzz-dsh-openai-subscription-0.0.2.tgz`。安装到 Web profile（把路径换成产物的实际**绝对路径**）：
+`npm pack` 会生成 `h2mzzz-dsh-openai-subscription-0.1.0.tgz`。安装到 Web profile（把路径换成产物的实际**绝对路径**）：
 
 ```sh
-dsh plugin --profile web add /absolute/path/to/h2mzzz-dsh-openai-subscription-0.0.2.tgz
+dsh plugin --profile web add /absolute/path/to/h2mzzz-dsh-openai-subscription-0.1.0.tgz
 ```
 
 在受支持版本的 Desktop 中，使用应用内 **「插件」→「添加插件」** 输入上述 `.tgz` 附件 URL 或 Desktop 电脑可访问的本地 `.tgz` 绝对路径，再按界面提示启用；**不要**运行 `dsh plugin --profile desktop` 或手工修改 Desktop profile。Web 和 Desktop 复用 UI，却各自拥有插件依赖与启用列表，Web 安装不会自动同步过去。Desktop 安装与登录流程尚待实测。仓库源码 ZIP 和 Git 地址没有安装所需的 `lib/`，不能直接当成可用插件包。
@@ -81,7 +81,7 @@ dsh plugin --profile web add /absolute/path/to/h2mzzz-dsh-openai-subscription-0.
 
 ## 已知限制与延期工作
 
-- 模型路由支持文字、普通工具调用，以及模型目录声明 `image` 时的用户图片与工具结果图片输入；通过 Host 的 DSH 附件服务读取并转换为 Codex 原生图片消息，不依赖生图条目是否启用。图片预览采用与 DSH pi-ai 一致的 2048×2048 像素预算、单图 1 MiB 编码目标与整次请求 20 MiB Base64 预算；历史卸载图片保留文字占位，超额返回标准卸载要求。已验证附件转换与实际 pi-ai 协议序列化，真实账号识图尚待验收。deferred tools、system/assistant/developer 中的图片与 stop sequences 不受支持。源码新增的实验性 `codex_generate_image` 是**独立 Host 工具**，随 Bundle 默认启用，通过 DSH 侧栏「插件」→ 本组合包 →「OpenAI 生图工具」开关独立启停，无需手写 `imageGen.enabled`。随包 Skill 与工具仅在生图条目启用且已登录时注册，关闭生图不影响文本登录或模型路由。工具结果给模型的仅是文字；插件工具卡片从受保护的会话产物路径读取图片。首版只支持 DSH **native 直接工具调用**；PTC `run_code` 的嵌套调用会拒绝，避免成功但没有会话图片卡片。本功能尚未在隔离 Loader/profile、浏览器 UI 和真实账号上完成端到端验收，**不是 v0.0.2 发布附件的功能**，当前开关和注册行为已经过模拟及构建检查，真实账号生图仍需单独验收。
+- 模型路由支持文字、普通工具调用，以及模型目录声明 `image` 时的用户图片与工具结果图片输入；通过 Host 的 DSH 附件服务读取并转换为 Codex 原生图片消息，不依赖生图条目是否启用。图片预览采用与 DSH pi-ai 一致的 2048×2048 像素预算、单图 1 MiB 编码目标与整次请求 20 MiB Base64 预算；历史卸载图片保留文字占位，超额返回标准卸载要求。已验证附件转换与实际 pi-ai 协议序列化，真实账号识图尚待验收。deferred tools、system/assistant/developer 中的图片与 stop sequences 不受支持。源码新增的实验性 `codex_generate_image` 是**独立 Host 工具**，随 Bundle 默认启用，通过 DSH 侧栏「插件」→ 本组合包 →「OpenAI 生图工具」开关独立启停，无需手写 `imageGen.enabled`。随包 Skill 与工具仅在生图条目启用且已登录时注册，关闭生图不影响文本登录或模型路由。工具结果给模型的仅是文字；插件工具卡片从受保护的会话产物路径读取图片。首版只支持 DSH **native 直接工具调用**；PTC `run_code` 的嵌套调用会拒绝，避免成功但没有会话图片卡片。本功能尚未在隔离 Loader/profile、浏览器 UI 和真实账号上完成端到端验收，作为 v0.1.0 的实验能力提供，当前开关和注册行为已经过模拟及构建检查，真实账号生图仍需单独验收。
 - 模型、取消与工具调用仍缺真实账号验证；登录状态刷新、退出与卸载的竞态只经过确定性的模拟测试，未在真实账号下验证。
 - 没有订阅额度、重置时间或 reset 卡功能。一次请求的 token 用量**不是**订阅额度，不能据此推算账户剩余额度。
 - Desktop 的安装、窗口适配与系统浏览器授权尚未实测；不要把 Web 的模拟或构建测试视为 Desktop 验收。不同电脑之间不复制 OAuth 凭据文件。
