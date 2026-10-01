@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@deepseek-ai/dsh-client-ui-tool/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { Context } from '@deepseek-ai/cordis'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
@@ -11,6 +12,9 @@ import remote from '../remote.ts'
 import { CodexSubscriptionSection, type CodexSubscriptionOperations } from './CodexSubscriptionSection.tsx'
 import { install as installStyles } from './CodexSubscriptionSection.module.css'
 import { en, zh } from './locales.ts'
+import { ToolImageView } from './imagegen/ToolImageView.tsx'
+import { install as installImageStyles } from './imagegen/ToolImageView.module.css'
+import { en as imageEn, zh as imageZh } from './imagegen/locales.ts'
 
 export const inject = ['remote', 'slots', 'locale']
 
@@ -41,6 +45,14 @@ function result<T>(response: RemoteResult<T>): T {
 export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const disposeRemote = await ctx.remote.$mount(remote)
   const disposeStyles = installStyles()
+  const disposeImageStyles = installImageStyles()
+  const imageView = ctx.inject(['slots', 'locale'], child => {
+    child.effect(() => child.locale.register('tool.codexImage', { en: imageEn, zh: imageZh }))
+    child.slots.inject('tool.call.toolview', () => child.slots.register({
+      name: 'tool.call.toolview', key: 'codex_generate_image', locale: 'tool.codexImage',
+    }, ToolImageView))
+  })
+  void Promise.resolve(imageView).catch(() => { /* A missing optional Tool view must not break settings. */ })
   const store = new StateStore()
   const call = async <T>(operation: () => Promise<RemoteResult<T>>): Promise<T> => {
     const next = result(await operation())
@@ -93,12 +105,16 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   })
   try { await ui } catch (error) {
     await ui.dispose()
+    await imageView.dispose()
+    disposeImageStyles()
     disposeStyles()
     await disposeRemote()
     throw error
   }
   return async () => {
     await ui.dispose()
+    await imageView.dispose()
+    disposeImageStyles()
     disposeStyles()
     await disposeRemote()
   }

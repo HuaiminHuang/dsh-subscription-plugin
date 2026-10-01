@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "OpenAI Image Generation",
+    "description": "Experimental tool: generate one image on request after subscription sign-in. Disabling it preserves text models."
+  }
+}

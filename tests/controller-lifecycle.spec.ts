@@ -44,6 +44,29 @@ function controller(overrides: Record<string, unknown> = {}): CodexSubscriptionC
 }
 
 describe('CodexSubscriptionController authorization lifecycle', () => {
+  it('keeps an image auth lease active through its callback so sign-out waits before deleting the grant', async () => {
+    const entered = deferred<void>()
+    const release = deferred<void>()
+    const deleteRecord = vi.fn(async () => {})
+    const subject = controller({
+      state: { status: 'signed-in', models: [] },
+      models: { getAuth: async () => ({ auth: { apiKey: 'synthetic-oauth-access' }, source: 'OAuth' }) },
+      ctx: { credentials: { deleteRecord }, authorization: { cancel: () => {} } },
+    })
+    const work = subject.withImageAuth(new AbortController().signal, async access => {
+      expect(access).toBe('synthetic-oauth-access')
+      entered.resolve()
+      await release.promise
+    }).then(() => 'done', () => 'cancelled')
+    await entered.promise
+    const signOut = subject.signOut()
+    await Promise.resolve()
+    expect(deleteRecord).not.toHaveBeenCalled()
+    release.resolve()
+    expect(await work).toBe('cancelled')
+    await signOut
+    expect(deleteRecord).toHaveBeenCalledTimes(1)
+  })
   it('delivers a notice published between the first stream yield and its next read', async () => {
     const instance = controller()
     const abort = new AbortController()

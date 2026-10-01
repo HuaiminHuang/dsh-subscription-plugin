@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "OpenAI 订阅接入",
+    "description": "使用 ChatGPT/Codex 订阅登录并接入文本模型。生图工具可在此组合包中单独启停。"
+  }
+}

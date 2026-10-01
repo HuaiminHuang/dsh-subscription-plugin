@@ -78,6 +78,14 @@ export class CodexSubscriptionController extends TypertRemoteService {
     return this.state.status === 'signed-in' ? this.catalog : []
   }
 
+  /** Host-local state notification for optional capabilities (never exposes the grant). */
+  subscribeState(listener: (state: CodexSubscriptionState) => void): () => void {
+    const notify = (): void => { listener(this.state) }
+    this.listeners.add(notify)
+    notify()
+    return () => { this.listeners.delete(notify) }
+  }
+
   /** Link an adapter request to the plugin lifetime and an optional caller cancellation signal. */
   openRequest(signal: AbortSignal | undefined): Disposable & { readonly signal: AbortSignal } {
     if (this.disposed || this.signOutTask !== undefined) {
@@ -99,6 +107,20 @@ export class CodexSubscriptionController extends TypertRemoteService {
         finish()
       },
     }
+  }
+
+  /** Borrow only a fresh, plugin-owned OAuth access for one Host image operation. */
+  async withImageAuth<T>(signal: AbortSignal, run: (access: string, signal: AbortSignal) => Promise<T>): Promise<T> {
+    using request = this.openRequest(signal)
+    if (this.state.status !== 'signed-in') throw new LlmError('Codex subscription is not signed in', 'NO_ADAPTER')
+    const resolved = await this.models.getAuth(PI_PROVIDER_ID, { signal: request.signal })
+    request.signal.throwIfAborted()
+    if (resolved?.source !== 'OAuth' || typeof resolved.auth.apiKey !== 'string') {
+      throw new LlmError('Codex subscription OAuth is unavailable', 'NO_ADAPTER')
+    }
+    const result = await run(resolved.auth.apiKey, request.signal)
+    request.signal.throwIfAborted()
+    return result
   }
 
   /** Read safe login state; this never returns a credential, token, or callback URL. */

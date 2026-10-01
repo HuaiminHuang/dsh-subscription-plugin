@@ -5,7 +5,7 @@ import { transform } from 'lightningcss'
 import { typertPlugin } from '@deepseek-ai/dsh-typert-generator/tsdown'
 
 const PACKAGE_ID = '@h2mzzz/dsh-openai-subscription'
-const clientExternals = new Set(['react', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'])
+const clientExternals = new Set(['react', 'react-dom', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'])
 const CSS_PREFIX = '\0dsh-openai-subscription-css:'
 
 /** Compile a package-owned CSS module with a lifecycle-owned style installer. */
@@ -57,11 +57,13 @@ export default defineConfig([
   {
     entry: {
       index: 'src/index.ts',
+      imagegen: 'src/imagegen-entry.ts',
       'typert.host': 'src/typert.host.ts',
       'typert.remote-client': 'src/remote.ts',
     },
     outDir: 'lib', format: ['esm'], platform: 'node', target: 'es2024',
     fixedExtension: false, dts: false, clean: false,
+    outputOptions: { chunkFileNames: '[name].js' },
     // Lowers standard decorators; reflection files remain explicit because the
     // upstream generator intentionally scans only its own workspace packages.
     plugins: [typertPlugin({ mode: 'package', faces: ['host'] })],

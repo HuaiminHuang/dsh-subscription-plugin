@@ -1,10 +1,14 @@
 import { TYPERT } from '../lib/typert.host.js'
 import { TYPERT_REMOTE } from '../lib/typert.remote-client.js'
 import { validateTypertManifest } from '@deepseek-ai/dsh-typert-loader'
-import { Context } from '@deepseek-ai/cordis'
+import { Context, Service } from '@deepseek-ai/cordis'
 import { createRequire } from 'node:module'
-import { readFileSync } from 'node:fs'
-import { name as hostName } from '../lib/index.js'
+import { readdirSync, readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+import { name as hostName, apply as mountHost, inject as hostInject } from '../lib/index.js'
+import { name as imageName, apply as mountImage, inject as imageInject } from '../lib/imagegen.js'
+import { readPluginMeta } from '../../deepseek-harness/packages/boot/app-boot/lib/index.js'
 import { apply as mountTypert, inject as typertInject } from '../../deepseek-harness/packages/typert/registry/lib/types/client/index.js'
 import { SlotRegistry } from '../../deepseek-harness/packages/client/ui-renderer/lib/types/client/registry.js'
 import { apply as mountGateway, inject as gatewayInject } from '../../deepseek-harness/packages/api/gateway/lib/types/client/index.js'
@@ -19,6 +23,97 @@ if (metadata.name !== packageName || hostName !== packageName || TYPERT_REMOTE.p
   || !patch.includes(`name: "${packageName}"`)) {
   throw new Error('Bundle metadata, patch, Host, and Remote must use the same scoped package name')
 }
+const skillPath = 'skills/codex-subscription-imagegen/SKILL.md'
+if (!metadata.files.includes(skillPath) || !readFileSync(new URL(`../${skillPath}`, import.meta.url), 'utf8').includes('codex_generate_image')
+  || !patch.includes('id: openai-subscription-imagegen')
+  || !patch.includes(`name: "${packageName}/imagegen"`)
+  || imageName !== `${packageName}/imagegen`
+  || metadata.exports['./imagegen']?.default !== './lib/imagegen.js') {
+  throw new Error('Built image tool must have its own default-enabled Bundle row and packaged Skill')
+}
+if (readFileSync(new URL('../lib/index.js', import.meta.url), 'utf8').includes('from "@deepseek-ai/dsh-tools"')) {
+  throw new Error('Text Host must not eagerly import the independently switchable image tool runtime')
+}
+// The pack list must name every built module: the build may emit shared chunks
+// (for example `codex-auth.js`) that each Host entry imports, and a file the
+// tarball omits makes the whole Bundle fail to load with ERR_MODULE_NOT_FOUND.
+// Inspect the real `npm pack` output instead of the working tree.
+const pack = spawnSync('npm', ['pack', '--dry-run', '--json'], {
+  cwd: fileURLToPath(new URL('..', import.meta.url)), encoding: 'utf8',
+})
+if (pack.status !== 0) throw new Error(`npm pack --dry-run failed: ${pack.stderr.trim()}`)
+const packedFiles = new Set(JSON.parse(pack.stdout)[0].files.map(entry => entry.path))
+const builtModules = readdirSync(new URL('../lib', import.meta.url))
+  .filter(name => name.endsWith('.js') || name.endsWith('.js.map'))
+  .map(name => `lib/${name}`)
+const unpacks = builtModules.filter(name => !packedFiles.has(name))
+if (unpacks.length > 0) {
+  throw new Error(`Built modules are missing from the pack list: ${unpacks.join(', ')}`)
+}
+// Follow relative imports across every packed module, so a chunk that imports a
+// further chunk cannot slip past a check that only reads the entry points.
+for (const module of builtModules.filter(name => name.endsWith('.js'))) {
+  const source = readFileSync(new URL(`../${module}`, import.meta.url), 'utf8')
+  for (const specifier of source.matchAll(/from "(\.\/[^"]+)"/gu)) {
+    const resolved = `lib/${specifier[1].slice(2)}`
+    if (!packedFiles.has(resolved)) {
+      throw new Error(`${module} imports ${resolved}, which the tarball does not contain`)
+    }
+  }
+}
+if (!packedFiles.has('lib/imagegen.js')
+  || !readFileSync(new URL('../lib/imagegen.js', import.meta.url), 'utf8').includes('codex_generate_image')) {
+  throw new Error('Built image feature chunk must be included in the package')
+}
+
+// Resolve metadata exactly as the Plugins panel does, including while a row is disabled.
+const packageUrl = new URL('../package.json', import.meta.url).href
+const accountMeta = readPluginMeta(packageName, packageUrl)
+const imageMeta = readPluginMeta(`${packageName}/imagegen`, packageUrl)
+if (accountMeta?.title?.zh !== 'OpenAI 订阅接入' || imageMeta?.title?.zh !== 'OpenAI 生图工具'
+  || accountMeta.error !== undefined || imageMeta.error !== undefined) {
+  throw new Error('Plugins panel cannot resolve the localized account and image tool titles')
+}
+
+// Activate the built Host with inert services to exercise the optional chunk,
+// packaged Skill lookup, and image owner teardown (not a real Loader/profile).
+const hostCtx = new Context()
+let mountedImageTool
+let mountedImageSkill
+let imageRoute
+hostCtx.provide('llm', { registerAdapter: () => () => {} })
+hostCtx.provide('credentials', { readRecord: async () => undefined, deleteRecord: async () => {} })
+hostCtx.provide('authorization', { registerFlow: () => () => {}, cancel: () => {} })
+hostCtx.provide('tools', { register: tool => { mountedImageTool = tool; return () => { mountedImageTool = undefined } } })
+hostCtx.provide('skills', { register: skill => { mountedImageSkill = skill; return () => { mountedImageSkill = undefined } } })
+hostCtx.provide('attachments', { saveImages: async () => [], readImage: async () => { throw new Error('not used') } })
+hostCtx.provide('sessionQuery', { observeSession: async () => { throw new Error('not used') } })
+hostCtx.provide('connection', { fetch: { register: route => { imageRoute = route; return async () => { imageRoute = undefined } } } })
+try {
+  const fiber = hostCtx.plugin({ inject: hostInject, apply: mountHost })
+  await fiber
+  if (imageRoute !== undefined) throw new Error('Text row must not mount the independently switchable image feature')
+  const controller = hostCtx.get('codexSubscription')
+  const imageFiber = hostCtx.plugin({ inject: imageInject, apply: mountImage })
+  await imageFiber
+  if (imageRoute?.path !== '/api/codex-subscription/image' || mountedImageSkill !== undefined) {
+    throw new Error('Built image row did not mount its login-gated owner')
+  }
+  hostCtx.get('codexSubscription').publish({ status: 'signed-in', models: [] })
+  if (mountedImageTool?.name !== 'codex_generate_image'
+    || mountedImageSkill?.name !== 'codex-subscription-imagegen'
+    || !mountedImageSkill.content.includes('codex_generate_image')) {
+    throw new Error('Built Host did not register its Tool and packaged Skill after sign-in')
+  }
+  hostCtx.get('codexSubscription').publish({ status: 'signed-out', models: [] })
+  if (mountedImageTool !== undefined || mountedImageSkill !== undefined || imageRoute === undefined) {
+    throw new Error('Built Host did not withdraw its Tool/Skill while preserving historical image reads')
+  }
+  await imageFiber.dispose()
+  if (hostCtx.get('codexSubscription') === undefined) throw new Error('Disabling the image row unloaded text login')
+  await fiber.dispose()
+  if (imageRoute !== undefined) throw new Error('Built Host left its image route after unload')
+} finally { await hostCtx.fiber.dispose() }
 const manifest = validateTypertManifest(packageName, TYPERT)
 const names = new Set(manifest.invocations.map(invocation => `${invocation.namespace}/${invocation.method}`))
 for (const name of ['codexSubscription/getState', 'codexSubscription/beginLogin', 'codexSubscription/watch', 'codexSubscription/refreshModels']) {
@@ -44,7 +139,10 @@ const client = clientContribution.factory(id => id === '@deepseek-ai/dsh-client-
   ? { Button: ({ children, onClick, disabled, ...props }) => {
     buttons.push({ label: children, onClick })
     return React.createElement('button', { onClick, disabled, 'aria-expanded': props['aria-expanded'] }, children)
-  }, StateDot: () => null }
+  }, StateDot: () => null,
+  MenuSurface: React.forwardRef(({ children, ...props }, ref) => React.createElement('div', { ...props, ref }, children)),
+  Tooltip: ({ children }) => children, IconRefreshOutlineRegular: () => React.createElement('span', null, 'reset'),
+  }
   : clientRequire(id))
 if (typeof client.apply !== 'function' || !Array.isArray(client.inject)) {
   throw new Error('Built Client factory has no Cordis plugin entry')
@@ -69,12 +167,26 @@ try {
   await ctx.plugin(SlotRegistry)
   ctx.slots.register({ name: 'root', children: {
     'settings.section': { kind: 'list', scope: 'root' },
+    'tool.call.toolview': { kind: 'keyed', scope: 'session' },
+    'conversation.input.model': { kind: 'single', scope: 'session' },
   } }, () => null)
   const fiber = ctx.plugin(client)
   await fiber
   const sections = ctx.slots.entries('settings.section')
   if (sections.length !== 1 || sections[0].options.id !== 'codex-subscription') {
     throw new Error('Built Client did not contribute its settings section')
+  }
+  const imageViews = ctx.slots.entries('tool.call.toolview')
+  if (imageViews.length !== 1 || imageViews[0].options.key !== 'codex_generate_image') {
+    throw new Error('Built Client did not contribute the image tool card')
+  }
+  const imageMarkup = renderToStaticMarkup(React.createElement(imageViews[0].component, {
+    t: key => key, phase: 'result', callId: 'call-1', toolName: 'codex_generate_image',
+    block: { isError: false, call: { name: 'codex_generate_image' },
+      meta: { sessionId: 'session-1', image: { attachmentId: `sha256:${'a'.repeat(64)}` } } },
+  }))
+  if (!imageMarkup.includes('loading') || imageMarkup.includes('sha256:') || imageMarkup.includes('img')) {
+    throw new Error('Built image card must load from its authenticated Host route, not inline image bytes or attachment IDs')
   }
   const chosen = []
   const render = state => renderToStaticMarkup(React.createElement(sections[0].component, {
@@ -163,11 +275,13 @@ try {
       || dom.window.document.body.textContent.includes('private Host diagnostic')) {
       throw new Error('A rejected Host operation must show safe feedback without leaking its error')
     }
+
   } finally {
     await act(async () => { root.unmount() })
     dom.window.close()
     globalThis.window = moduleWindow
     delete globalThis.document
+    delete globalThis.ResizeObserver
     delete globalThis.IS_REACT_ACT_ENVIRONMENT
   }
   buttons.length = 0
@@ -188,6 +302,9 @@ try {
   await fiber.dispose()
   if (ctx.slots.entries('settings.section').length !== 0) {
     throw new Error('Built Client did not withdraw its settings section')
+  }
+  if (ctx.slots.entries('tool.call.toolview').length !== 0) {
+    throw new Error('Built Client did not withdraw its image tool card')
   }
 } finally {
   await ctx.fiber.dispose()
