@@ -32,6 +32,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
       beginLogin(method: CodexLoginMethod): Promise<RemoteResult<CodexSubscriptionState>>
       cancelLogin(attemptId: string): Promise<RemoteResult<CodexSubscriptionState>>
       signOut(): Promise<RemoteResult<CodexSubscriptionState>>
+      refreshModels(): Promise<RemoteResult<CodexSubscriptionState>>
       watch(signal?: AbortSignal): RemoteStreamHandle<CodexSubscriptionState, never>
     }
   }
@@ -45,6 +46,7 @@ export const TYPERT_REMOTE: TypertRemoteContribution = {
     { id: '@h2mzzz/dsh-openai-subscription#codexSubscription/beginLogin', service: 'codexSubscription', namespace: 'codexSubscription', method: 'beginLogin', invocation: { kind: 'direct' }, parameters: [{ name: 'method', wire: 'method', source: 'json', codec: { mode: 'strict', typeSymbol: '@h2mzzz/dsh-openai-subscription#loginMethod', create: loginMethod } }], result: { mode: 'strict', typeSymbol: '@h2mzzz/dsh-openai-subscription#state', create: stateCodec }, sourceLocation: { file: 'src/controller.ts', line: 95, column: 3 } },
     { id: '@h2mzzz/dsh-openai-subscription#codexSubscription/cancelLogin', service: 'codexSubscription', namespace: 'codexSubscription', method: 'cancelLogin', invocation: { kind: 'direct' }, parameters: [{ name: 'attemptId', wire: 'attemptId', source: 'json', codec: { mode: 'strict', typeSymbol: 'string', create: string } }], result: { mode: 'strict', typeSymbol: '@h2mzzz/dsh-openai-subscription#state', create: stateCodec }, sourceLocation: { file: 'src/controller.ts', line: 124, column: 3 } },
     { id: '@h2mzzz/dsh-openai-subscription#codexSubscription/signOut', service: 'codexSubscription', namespace: 'codexSubscription', method: 'signOut', invocation: { kind: 'direct' }, parameters: [], result: { mode: 'strict', typeSymbol: '@h2mzzz/dsh-openai-subscription#state', create: stateCodec }, sourceLocation: { file: 'src/controller.ts', line: 157, column: 3 } },
+    { id: '@h2mzzz/dsh-openai-subscription#codexSubscription/refreshModels', service: 'codexSubscription', namespace: 'codexSubscription', method: 'refreshModels', invocation: { kind: 'direct' }, parameters: [], result: { mode: 'strict', typeSymbol: '@h2mzzz/dsh-openai-subscription#state', create: stateCodec }, sourceLocation: { file: 'src/controller.ts', line: 203, column: 3 } },
     { id: '@h2mzzz/dsh-openai-subscription#codexSubscription/watch', service: 'codexSubscription', namespace: 'codexSubscription', method: 'watch', mode: 'stream', invocation: { kind: 'direct' }, parameters: [], cancellation: { parameter: 'signal' }, result: { mode: 'strict', typeSymbol: '@h2mzzz/dsh-openai-subscription#state', create: stateCodec }, sourceLocation: { file: 'src/controller.ts', line: 168, column: 10 } },
   ],
 }

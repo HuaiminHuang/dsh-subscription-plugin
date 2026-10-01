@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { Context } from '@deepseek-ai/cordis'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { createModels } from '@earendil-works/pi-ai'
-import type { Api, AuthEvent, AuthPrompt, Model, MutableModels } from '@earendil-works/pi-ai'
+import type { Api, AuthEvent, AuthPrompt, Credential, Model, MutableModels } from '@earendil-works/pi-ai'
 import type { AuthorizationFlow, AuthorizationNotice } from '@deepseek-ai/dsh-authorization'
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { AdapterRegistrationHandle } from '@deepseek-ai/dsh-llm'
@@ -11,6 +11,13 @@ import type { CodexLoginMethod, CodexSubscriptionState } from './types.ts'
 import { CodexSubscriptionAdapter } from './adapter.ts'
 import { CODEX_CREDENTIAL_KEY, PI_PROVIDER_ID, PROVIDER_ID } from './constants.ts'
 import { codexCredentialStore, isolatedAuthContext } from './credential-store.ts'
+import { codexBaselineModels, fetchCodexModels, mergeCatalog } from './discovery.ts'
+
+/** Bound one catalog discovery so a hanging endpoint cannot hold the login check open. */
+const DISCOVERY_TIMEOUT_MS = 15_000
+
+/** Thrown inside the login-state read when discovery was refused by lifecycle state. */
+class DiscoveryUnavailable extends Error {}
 
 interface Attempt {
   readonly id: string
@@ -39,6 +46,14 @@ export class CodexSubscriptionController extends TypertRemoteService {
   private readonly listeners = new Set<() => void>()
   private readonly pendingRefreshes = new Set<Promise<void>>()
   private refreshEpoch = 0
+  private catalogRefreshTask: Promise<CodexSubscriptionState> | undefined
+  private discoveryDone = false
+  /** The in-flight discovery attempt, so concurrent checks share one request. */
+  private discoveredModels: Promise<void> | undefined
+  /** The catalog this process offers: the account's live models once discovery answers. */
+  private catalog: readonly Model<Api>[] = codexBaselineModels
+  /** Discovery transport; a Host keeps the global fetch, tests inject a stub. */
+  private readonly discoveryFetch: typeof fetch = (input, init) => fetch(input, init)
   private disposed = false
   private loginRun: Promise<unknown> | undefined
   private loginTask: Promise<void> | undefined
@@ -54,9 +69,13 @@ export class CodexSubscriptionController extends TypertRemoteService {
     void this.refreshLoginState()
   }
 
-  /** The installed pi-ai Codex catalog after a saved OAuth grant is found; server access is unverified. */
+  /**
+   * The catalog this process offers after a saved OAuth grant is found.
+   * Once discovery has answered for this account it is the live catalog; until then
+   * it is the catalog installed with pi-ai, whose server access is unverified.
+   */
   availableModels(): readonly Model<Api>[] {
-    return this.state.status === 'signed-in' ? this.models.getModels(PI_PROVIDER_ID) : []
+    return this.state.status === 'signed-in' ? this.catalog : []
   }
 
   /** Link an adapter request to the plugin lifetime and an optional caller cancellation signal. */
@@ -107,6 +126,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
     }
     attempt.timer.unref()
     this.attempt = attempt
+    this.discoveryDone = false
     this.publish({ status: 'signing-in', attemptId: attempt.id, method, models: [] })
     const task = this.ctx.authorization.begin({
       key: CODEX_CREDENTIAL_KEY,
@@ -159,6 +179,23 @@ export class CodexSubscriptionController extends TypertRemoteService {
     return this.state
   }
 
+  /** Re-fetch the model catalog while retaining the current list on failure. */
+  @Remote
+  async refreshModels(): Promise<CodexSubscriptionState> {
+    if (this.catalogRefreshTask !== undefined) return this.catalogRefreshTask
+    if (this.disposed || this.signOutTask !== undefined || this.state.status !== 'signed-in') {
+      throw new LlmError('Sign in before refreshing models', 'INVALID_AUTHORIZATION_METHOD')
+    }
+    this.discoveryDone = false
+    const task = (async () => {
+      await this.refreshLoginState()
+      if (!this.discoveryDone) throw new LlmError('Could not refresh models', 'MODEL_DISCOVERY_FAILED')
+      return this.state
+    })()
+    this.catalogRefreshTask = task
+    try { return await task } finally { this.catalogRefreshTask = undefined }
+  }
+
   /** Remove only this plugin's OAuth grant and withdraw its provider route. */
   @Remote
   async signOut(): Promise<CodexSubscriptionState> {
@@ -171,6 +208,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
 
   private async finishSignOut(): Promise<CodexSubscriptionState> {
     this.refreshEpoch++
+    this.discoveryDone = false
     if (this.attempt !== undefined) {
       clearTimeout(this.attempt.timer)
       this.attempt.controller.abort()
@@ -264,6 +302,18 @@ export class CodexSubscriptionController extends TypertRemoteService {
   private async checkLoginState(epoch: number): Promise<void> {
     const checkedAt = new Date().toISOString()
     try {
+      // The grant may be valid while this process has never asked the vendor for
+      // the account's current catalog, so discover once before reading the list.
+      if (!this.discoveryDone) {
+        try {
+          await this.discoverModels(epoch)
+        } catch {
+          // Sign-out or unload can refuse the request between the state check and
+          // the call; that is a lifecycle answer, not a login failure.
+          throw new DiscoveryUnavailable()
+        }
+        if (this.disposed || this.signOutTask !== undefined || epoch !== this.refreshEpoch) return
+      }
       const models = await this.models.getAvailable(PI_PROVIDER_ID)
       if (this.disposed || this.signOutTask !== undefined || epoch !== this.refreshEpoch) return
       if (models.length === 0) {
@@ -275,15 +325,63 @@ export class CodexSubscriptionController extends TypertRemoteService {
       else this.registration.replace([PROVIDER_ID])
       this.publish({
         status: 'signed-in', checkedAt,
-        models: models.map(model => ({ id: model.id, name: model.name })),
+        models: this.catalog.map(model => ({ id: model.id, name: model.name })),
       })
-    } catch {
+    } catch (error) {
+      if (error instanceof DiscoveryUnavailable) return
       if (this.disposed || this.signOutTask !== undefined || epoch !== this.refreshEpoch) return
       this.registration?.replace([])
       this.publish({
         status: 'error', models: [], checkedAt,
         error: 'saved-login-unavailable',
       })
+    }
+  }
+
+  /**
+   * Ask the vendor for this account's catalog.
+   * A vendor or transport failure is not a login failure: the catalog already in
+   * use stays and the next state check retries discovery. The request is owned by
+   * the plugin's active-request set, so sign-out and unload abort it, and it is
+   * bounded so a hanging endpoint cannot hold the login check open.
+   * @param epoch - login-state generation that requested the discovery.
+   */
+  private async discoverModels(epoch: number): Promise<void> {
+    const credential = await this.readGrant()
+    if (credential === undefined || epoch !== this.refreshEpoch) return
+    if (this.discoveredModels !== undefined) {
+      await this.discoveredModels
+      return
+    }
+    const run = this.runDiscovery(credential, epoch)
+    this.discoveredModels = run
+    try { await run } finally { if (this.discoveredModels === run) this.discoveredModels = undefined }
+  }
+
+  /** One discovery attempt under the plugin's request ownership and a bounded wait. */
+  private async runDiscovery(credential: Credential, epoch: number): Promise<void> {
+    using request = this.openRequest(undefined)
+    const signal = AbortSignal.any([request.signal, AbortSignal.timeout(DISCOVERY_TIMEOUT_MS)])
+    try {
+      const live = await fetchCodexModels(this.discoveryFetch, credential, signal)
+      if (epoch !== this.refreshEpoch || this.disposed) return
+      // An empty answer keeps the installed catalog: a smaller or older client
+      // generation is answered with no models, which is not a retirement, and it
+      // must be retried rather than treated as a completed discovery.
+      if (live.length === 0) return
+      this.catalog = mergeCatalog(live, this.catalog)
+      this.discoveryDone = true
+    } catch {
+      // Cancellation, timeout, and vendor failures all keep the catalog in use.
+    }
+  }
+
+  /** Read this plugin's own OAuth grant, or undefined when nothing is stored. */
+  private async readGrant(): Promise<Credential | undefined> {
+    try {
+      return await codexCredentialStore(this.ctx).read(PI_PROVIDER_ID)
+    } catch {
+      return undefined
     }
   }
 

@@ -21,7 +21,7 @@ if (metadata.name !== packageName || hostName !== packageName || TYPERT_REMOTE.p
 }
 const manifest = validateTypertManifest(packageName, TYPERT)
 const names = new Set(manifest.invocations.map(invocation => `${invocation.namespace}/${invocation.method}`))
-for (const name of ['codexSubscription/getState', 'codexSubscription/beginLogin', 'codexSubscription/watch']) {
+for (const name of ['codexSubscription/getState', 'codexSubscription/beginLogin', 'codexSubscription/watch', 'codexSubscription/refreshModels']) {
   if (!names.has(name)) throw new Error(`Built Typert manifest is missing ${name}`)
 }
 if (names.has('codexSubscription/refreshLogin') || TYPERT_REMOTE.descriptors.some(item => item.method === 'refreshLogin')) {
@@ -135,6 +135,29 @@ try {
       t: key => key, useState: selector => selector({ status: 'signed-in', models: [] }),
       operations: { signOut: async () => { throw new Error('private Host diagnostic') } },
     })) })
+    let rejectRefresh
+    let refreshCalls = 0
+    const retainedState = { status: 'signed-in', models: [{ id: 'live-model', name: 'Live model' }] }
+    await act(async () => { root.render(React.createElement(sections[0].component, {
+      t: key => key, useState: selector => selector(retainedState),
+      operations: {
+        refreshModels: () => { refreshCalls++; return new Promise((_resolve, reject) => { rejectRefresh = reject }) },
+        signOut: async () => { throw new Error('private Host diagnostic') },
+      },
+    })) })
+    await click('refreshModels')
+    const refreshButton = [...dom.window.document.querySelectorAll('button')].find(item => item.textContent === 'refreshModels')
+    if (!refreshButton?.disabled || !dom.window.document.body.textContent.includes('Live model')) {
+      throw new Error('Refreshing models must prevent repeated clicks and retain the catalog')
+    }
+    await click('refreshModels')
+    if (refreshCalls !== 1) throw new Error('Repeated refresh clicks issued duplicate Host calls')
+    await act(async () => { rejectRefresh(new Error('private discovery diagnostic')) })
+    if (refreshButton.disabled || !dom.window.document.body.textContent.includes('refreshModelsFailed')
+      || !dom.window.document.body.textContent.includes('Live model')
+      || dom.window.document.body.textContent.includes('private discovery diagnostic')) {
+      throw new Error('Failed model refresh must retain the list and offer a safe retry')
+    }
     await click('signOut')
     if (!dom.window.document.body.textContent.includes('operationFailed')
       || dom.window.document.body.textContent.includes('private Host diagnostic')) {

@@ -7,7 +7,7 @@ describe('Typert Host manifest', () => {
     const manifest = validateTypertManifest('@h2mzzz/dsh-openai-subscription', TYPERT)
     expect(manifest.face).toBe('host')
     expect(manifest.invocations.map(item => item.method)).toEqual([
-      'getState', 'beginLogin', 'cancelLogin', 'signOut', 'watch',
+      'getState', 'beginLogin', 'cancelLogin', 'signOut', 'refreshModels', 'watch',
     ])
     expect(manifest.invocations.every(item => item.namespace === 'codexSubscription')).toBe(true)
   })

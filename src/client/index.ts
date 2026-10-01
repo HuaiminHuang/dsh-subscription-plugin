@@ -56,6 +56,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
       beginLogin: method => call(() => child.remote.codexSubscription.beginLogin(method)),
       cancelLogin: attemptId => call(() => child.remote.codexSubscription.cancelLogin(attemptId)),
       signOut: () => call(() => child.remote.codexSubscription.signOut()),
+      refreshModels: () => call(() => child.remote.codexSubscription.refreshModels()),
     }
     child.effect(() => child.locale.register('settings.codexSubscription', { en, zh }))
     child.effect(() => {

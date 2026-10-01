@@ -12,6 +12,7 @@ export interface CodexSubscriptionOperations {
   beginLogin(method: CodexLoginMethod): Promise<CodexSubscriptionState>
   cancelLogin(attemptId: string): Promise<CodexSubscriptionState>
   signOut(): Promise<CodexSubscriptionState>
+  refreshModels(): Promise<CodexSubscriptionState>
 }
 
 /** Data injected from the Client plugin activation. */
@@ -42,6 +43,9 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
   const [copied, setCopied] = useState(false)
   const [methodsExpanded, setMethodsExpanded] = useState(false)
   const [operationFailed, setOperationFailed] = useState(false)
+  const [refreshingModels, setRefreshingModels] = useState(false)
+  const [modelsRefreshFailed, setModelsRefreshFailed] = useState(false)
+  const refreshInFlight = useRef(false)
   const pendingBrowserTab = useRef<Window | null>(null)
   const mounted = useRef(true)
   const busy = state.status === 'signing-in' || state.status === 'checking'
@@ -116,6 +120,19 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
     runOperation(operations.beginLogin('device_code'))
   }
 
+  const refreshModels = (): void => {
+    if (refreshInFlight.current) return
+    refreshInFlight.current = true
+    setRefreshingModels(true)
+    setModelsRefreshFailed(false)
+    void operations.refreshModels().catch(() => {
+      if (mounted.current) setModelsRefreshFailed(true)
+    }).finally(() => {
+      refreshInFlight.current = false
+      if (mounted.current) setRefreshingModels(false)
+    })
+  }
+
   return (
     <section className={css.section} aria-busy={busy}>
       <div>
@@ -132,7 +149,7 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
             {state.status === 'signing-in' && state.attemptId !== undefined ? (
               <Button variant="outline" size="sm" onClick={() => { cancel(state.attemptId!) }}>{t('cancel')}</Button>
             ) : state.status === 'signed-in' ? (
-              <Button variant="ghost" size="sm" onClick={() => { runOperation(operations.signOut()) }}>{t('signOut')}</Button>
+              <Button variant="ghost" size="sm" disabled={refreshingModels} onClick={() => { runOperation(operations.signOut()) }}>{t('signOut')}</Button>
             ) : canSignIn ? (
               <Button variant="primary" size="sm" aria-expanded={methodsExpanded} aria-controls="codex-subscription-methods"
                 onClick={() => { setMethodsExpanded(expanded => !expanded) }}>
@@ -181,7 +198,13 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
         )}
       </div>
       <div>
-        <h3 className={css.modelsTitle}>{t('models')}</h3>
+        <div className={css.cardHeader} aria-busy={refreshingModels}>
+          <h3 className={css.modelsTitle}>{t('models')}</h3>
+          {state.status === 'signed-in' && (
+            <Button variant="outline" size="sm" disabled={refreshingModels} onClick={refreshModels}>{t('refreshModels')}</Button>
+          )}
+        </div>
+        {modelsRefreshFailed && <p className={css.error} role="alert">{t('refreshModelsFailed')}</p>}
         {state.models.length === 0 ? <p className={css.empty}>{t('noModels')}</p> : (
           <ul className={css.models}>{state.models.map(model => <li key={model.id}><span>{model.name}</span><code>{model.id}</code></li>)}</ul>
         )}
