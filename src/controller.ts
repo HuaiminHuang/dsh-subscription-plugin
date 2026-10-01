@@ -6,7 +6,8 @@ import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-code
 import { createModels } from '@earendil-works/pi-ai'
 import type { Api, AuthEvent, AuthPrompt, Credential, Model, MutableModels } from '@earendil-works/pi-ai'
 import type { AuthorizationFlow, AuthorizationNotice } from '@deepseek-ai/dsh-authorization'
-import { LlmError } from '@deepseek-ai/dsh-llm'
+import { LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
+import type { CodexImageContext } from './pi-context.ts'
 import type { AdapterRegistrationHandle } from '@deepseek-ai/dsh-llm'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type { CodexLoginMethod, CodexSubscriptionState } from './types.ts'
@@ -80,6 +81,14 @@ export class CodexSubscriptionController extends TypertRemoteService {
    */
   availableModels(): readonly Model<Api>[] {
     return this.state.status === 'signed-in' ? this.catalog : []
+  }
+
+  /** Borrow genuinely optional Host services; vision remains independent of the image-generation row. */
+  imageContext(): CodexImageContext | undefined {
+    const attachments = this.ctx.get('attachments')
+    if (!attachments) return undefined
+    return { attachments, resolveAccess: ref => resolveImageAttachmentAccess(attachments,
+      hostPath => this.ctx.get('fs')?.processPathFromHostPath(hostPath), ref) }
   }
 
   /** Host-local state notification for optional capabilities (never exposes the grant). */

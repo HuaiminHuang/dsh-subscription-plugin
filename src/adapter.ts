@@ -1,10 +1,10 @@
 import { speedPayload } from './speed.ts'
-import { attributionHeaders, LlmAdapter, LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import { attributionHeaders, contentHasImage, LlmAdapter, LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, LlmModelInfo, LlmModelReasoningInfo, LlmProviderInfo, LlmResolvedModelInfo, PreparedAdapterCall, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { getSupportedThinkingLevels } from '@earendil-works/pi-ai'
 import type { Api, Model, ModelThinkingLevel, ThinkingLevel } from '@earendil-works/pi-ai'
 import { PROVIDER_ID } from './constants.ts'
-import { toPiContext } from './pi-context.ts'
+import { toPiContext, toPiImageContext } from './pi-context.ts'
 import { toStreamChunks } from './stream.ts'
 import type { CodexSubscriptionController } from './controller.ts'
 
@@ -76,8 +76,7 @@ export class CodexSubscriptionAdapter extends LlmAdapter {
       provider: PROVIDER_ID,
       id: model.id,
       name: model.name,
-      // Image input is intentionally deferred until attachment conversion is verified against Codex.
-      inputModalities: ['text'],
+      inputModalities: [...model.input],
       context: { contextWindow: model.contextWindow },
       ...reasoning === undefined ? {} : { reasoning },
     }
@@ -93,7 +92,14 @@ export class CodexSubscriptionAdapter extends LlmAdapter {
       throw new LlmError(`Codex model "${model.id}" does not support reasoning effort "${options.reasoningEffort}"`, 'UNSUPPORTED_REASONING_EFFORT')
     }
     using request = this.controller.openRequest(options.signal)
-    const events = this.controller.models.streamSimple(model, toPiContext({ ...options, signal: request.signal }), {
+    const containsImages = options.messages.some(message => contentHasImage(message.content))
+    if (containsImages && !model.input.includes('image')) throw new LlmError(`Codex model "${model.id}" does not support image input`, 'UNSUPPORTED_CONTENT')
+    const images = containsImages ? this.controller.imageContext() : undefined
+    if (containsImages && !images) throw new LlmError('Codex image input requires the attachment service', 'UNSUPPORTED_CONTENT')
+    const input = { ...options, signal: request.signal }
+    const context = images ? await toPiImageContext(input, images) : toPiContext(input)
+    request.signal.throwIfAborted()
+    const events = this.controller.models.streamSimple(model, context, {
       signal: request.signal,
       ...options.temperature === undefined ? {} : { temperature: options.temperature },
       ...options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens },

@@ -1,6 +1,8 @@
-import { LlmError } from '@deepseek-ai/dsh-llm'
-import type { GenerateOptions, RequestMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
-import type { AssistantMessage, Context as PiContext, Message as PiMessage, Tool } from '@earendil-works/pi-ai'
+import { IMAGE_OFFLOAD_REQUIRED_CODE, LlmError, offloadedImageText, projectOffloadedImages, requestImageHandleText, requiredImageOffload } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, ImageAttachmentAccessResolver, RequestMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { requestImageDimensions } from '@deepseek-ai/dsh-attachment'
+import type { AttachmentId, AttachmentStore, RequestImageAttachment } from '@deepseek-ai/dsh-attachment'
+import type { AssistantMessage, Context as PiContext, ImageContent, Message as PiMessage, TextContent, Tool } from '@earendil-works/pi-ai'
 import { PI_PROVIDER_ID } from './constants.ts'
 
 /** Zero-valued history usage required by pi-ai assistant messages. */
@@ -65,8 +67,21 @@ function toolsOf(options: GenerateOptions): Tool[] | undefined {
   return options.tools?.map(tool => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))
 }
 
-/** Convert the text and tool subset supported by the first Codex release into pi-ai context. */
-export function toPiContext(options: GenerateOptions): PiContext {
+function convertContext(options: GenerateOptions, images?: ReadonlyMap<AttachmentId, RequestImageAttachment>,
+  resolveAccess: ImageAttachmentAccessResolver = () => undefined): PiContext {
+  const contentOf = (message: RequestMessage): string | (TextContent | ImageContent)[] => {
+    if (!images || !message.content.some(block => block.type === 'image')) return textOf(message)
+    return message.content.flatMap((block): (TextContent | ImageContent)[] => {
+      if (block.type === 'text') return [{ type: 'text', text: block.text }]
+      if (block.type !== 'image') throw new LlmError(`Codex subscription does not support ${block.type} content`, 'UNSUPPORTED_CONTENT')
+      const version = images.get(block.attachment.attachmentId)
+      if (!version) throw new LlmError('Codex request image is unavailable', 'UNSUPPORTED_CONTENT')
+      return [
+        { type: 'text', text: requestImageHandleText(block.attachment, version, resolveAccess(block.attachment)) },
+        { type: 'image', data: Buffer.from(version.data).toString('base64'), mimeType: version.mediaType },
+      ]
+    })
+  }
   const [first, ...remaining] = options.messages
   const systemPrompt = options.system ?? (first?.role === 'system' ? textOf(first) : undefined)
   const history = options.system === undefined && first?.role === 'system' ? remaining : options.messages
@@ -76,8 +91,10 @@ export function toPiContext(options: GenerateOptions): PiContext {
   for (const message of history) {
     switch (message.role) {
       case 'system':
-      case 'user':
         messages.push({ role: 'user', content: textOf(message), timestamp: 0 })
+        break
+      case 'user':
+        messages.push({ role: 'user', content: contentOf(message), timestamp: 0 })
         break
       case 'assistant': {
         const assistant = assistantOf(message)
@@ -87,16 +104,18 @@ export function toPiContext(options: GenerateOptions): PiContext {
         messages.push(assistant)
         break
       }
-      case 'tool':
+      case 'tool': {
+        const content = contentOf(message)
         messages.push({
           role: 'toolResult',
           toolCallId: message.toolCallId,
           toolName: toolNames.get(message.toolCallId) ?? 'unknown',
-          content: [{ type: 'text', text: textOf(message) || '(no output)' }],
+          content: typeof content === 'string' ? [{ type: 'text', text: content || '(no output)' }] : content,
           isError: message.isError ?? false,
           timestamp: 0,
         })
         break
+      }
       case 'developer':
         throw new LlmError('Codex subscription does not support developer messages in this release', 'UNSUPPORTED_CONTENT')
     }
@@ -107,4 +126,47 @@ export function toPiContext(options: GenerateOptions): PiContext {
     messages,
     ...tools === undefined || tools.length === 0 ? {} : { tools },
   }
+}
+
+/** Convert text and ordinary tool calls; image input requires the async attachment path. */
+export function toPiContext(options: GenerateOptions): PiContext { return convertContext(options) }
+
+/** Host-only attachment services for converting user and tool-result images. */
+export interface CodexImageContext {
+  attachments: AttachmentStore
+  resolveAccess: ImageAttachmentAccessResolver
+}
+
+/** Resolve bounded image previews, preserve offloaded placeholders, and send pi-ai image blocks.
+ * Reads share the request's cancellation signal; durable session history is never mutated.
+ */
+export async function toPiImageContext(options: GenerateOptions, images: CodexImageContext): Promise<PiContext> {
+  const versions = new Map<AttachmentId, RequestImageAttachment>()
+  // Reject unsupported roles before reading any attachments, including leading system images.
+  for (const message of options.messages) {
+    if (message.role === 'developer' || message.content.some(block => block.type !== 'text' && block.type !== 'image'
+      && !(message.role === 'assistant' && (block.type === 'reasoning' || block.type === 'tool-call')))) {
+      throw new LlmError('Codex subscription cannot convert this message content', 'UNSUPPORTED_CONTENT')
+    }
+    if (message.role !== 'user' && message.role !== 'tool' && message.content.some(block => block.type === 'image')) {
+      throw new LlmError(`Codex subscription cannot send images in ${message.role} messages`, 'UNSUPPORTED_CONTENT')
+    }
+  }
+  for (const message of options.messages) {
+    for (const block of message.content) {
+      if (block.type !== 'image' || block.offloaded === true || versions.has(block.attachment.attachmentId)) continue
+      options.signal?.throwIfAborted()
+      const ref = block.attachment
+      const version = await images.attachments.readImageRequest(ref, {
+        ...requestImageDimensions(ref.width, ref.height, 2048 * 2048), maxBytes: 1024 * 1024,
+      }, options.signal)
+      options.signal?.throwIfAborted()
+      versions.set(ref.attachmentId, version)
+    }
+  }
+  const offloadImages = requiredImageOffload(options.messages, { representation: 'base64', maxBytes: 20 * 1024 * 1024 },
+    block => versions.get(block.attachment.attachmentId)!.bytes)
+  if (offloadImages > 0) throw new LlmError('Codex request images exceed the 20 MiB payload bound', IMAGE_OFFLOAD_REQUIRED_CODE, { offloadImages })
+  const messages = projectOffloadedImages(options.messages, ref => offloadedImageText(ref, images.resolveAccess(ref)))
+  return convertContext({ ...options, messages: [...messages] }, versions, images.resolveAccess)
 }
