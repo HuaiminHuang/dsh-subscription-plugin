@@ -6,7 +6,7 @@
 
 用户从目标 DSH profile 的 Plugins 页面启用一个独立 Bundle，在原有设置窗口的 **OpenAI** 页面完成 ChatGPT 浏览器授权；授权后从原有会话模型选择器选择 Codex 模型，通过 DSH `LlmAdapter` 完成真实对话，并在设置页查看该账户实际提供的额度窗口、已用比例与重置时间。提供商展示名称为 OpenAI，路由 ID 保持独立的 `codex-subscription`，不占用官方可配置的 `openai`。可用 reset 卡如能从同一登录态可靠读取，单独展示；使用 reset 卡必须由用户明确确认。
 
-插件默认不进入 Web、Desktop 或 Headless 组合，不修改官方 `llm-pi-ai`、`ui-settings-models`、`api-remotes`、DeepSeek 账户页或 Electron 原生窗口。当前目标是一个只支持 Codex 的插件包；多提供商、多账号池、Fast 模式、生图、搜索、跨提供商故障转移和财务账单均不在首版范围内。不能把“订阅额度”解释成 DSH 一次模型调用的 `TokenUsage` 或用户实际付款金额。
+插件默认不进入 Web、Desktop 或 Headless 组合，不修改官方 `llm-pi-ai`、`ui-settings-models`、`api-remotes`、DeepSeek 账户页或 Electron 原生窗口。当前目标是一个只支持 Codex 的插件包；多提供商、多账号池、Fast 模式、生图、搜索、跨提供商故障转移和财务账单均不在首版范围内。后续可选生图能力有[独立的工具与 Skill 设计计划](IMAGE_GENERATION_TOOL_PLAN.md)，不改变本文首版范围。不能把“订阅额度”解释成 DSH 一次模型调用的 `TokenUsage` 或用户实际付款金额。
 
 外部插件必须按 DSH 目标版本发布并声明经验证的 peer 范围。兼容性预检能拒绝已知版本不符，但不能替代真实启动、模型流或授权回调验证。启用后的插件代码仍与 Host 同进程运行：未处理的异步异常可能使应用退出，不能承诺插件故障绝不影响 DSH。
 
@@ -25,7 +25,7 @@
 
 ## 3. 单包结构与数据所有权
 
-首版优先采用**一个外部 npm 包、两个运行入口**，而非先拆分多个服务包：包名为 `@h2mzzz/dsh-openai-subscription`（新 npm 包的 scope 必须使用小写），`src/index.ts` 为 Cordis Host 插件，`src/client/index.ts` 为浏览器插件，`cordis.patch.yml` 提供一个独立 Loader entry；包元数据声明 `dsh.bundle.patch` 与 Web Client entry。仅在 Host/Client 有独立发布需求时再拆包。没有独立 Node 应用或额外的公开命令行入口；应用通过现有 `dsh` profile 启动。凭据键保留无 scope 的历史值以兼容已有记录。
+采用**一个外部 npm 包、Host 与 Client 两类入口**，而非拆分多个服务包：包名为 `@h2mzzz/dsh-openai-subscription`（新 npm 包的 scope 必须使用小写），`src/index.ts` 为 Cordis Host 插件，`src/client/index.ts` 为浏览器插件，`cordis.patch.yml` 提供三个可独立启停的 Loader entry（订阅接入、生图工具与紧凑模型滑块）；包元数据声明 `dsh.bundle.patch` 与 Web Client entry。仅在 Host/Client 有独立发布需求时再拆包。没有独立 Node 应用或额外的公开命令行入口；应用通过现有 `dsh` profile 启动。凭据键保留无 scope 的历史值以兼容已有记录。
 
 Host 内按责任划分模块：
 
@@ -55,9 +55,9 @@ Bundle 装载后页面可见，即使没有 Codex 凭据也能点击登录。Hos
 
 ### 4.3 模型调用
 
-插件优先使用 pi-ai 公开的 Codex provider 处理 OAuth 刷新和 Codex 请求协议，自己只承担 DSH `LlmAdapter` 的必要转换。`listModels()` 仅在保存的凭据可用时公布锁定的 pi-ai 静态目录；这不证明单个模型已获服务端授权。`resolveModel()` 报告上下文、输入类型及该型号实际可发送的推理档位；支持 Medium 时将它声明为插件默认档位，直接调用适配器而未指定档位时也发送 Medium，显式选择优先。Web profile 的默认型号在其 `agent-default-model` 配置中设为 `gpt-5.6-terra`，不在插件内改写其他 profile 的默认选择。Minimal 若映射为 Low 则不重复呈现，"off" 若仅省略参数而不能关闭服务端思考则不呈现。`prepareCall()` 绑定目录与实际请求使用的同一代适配器状态，避免登录或配置变化让模型元数据与请求目标不一致。
+插件优先使用 pi-ai 公开的 Codex provider 处理 OAuth 刷新和 Codex 请求协议，自己只承担 DSH `LlmAdapter` 的必要转换。`listModels()` 仅在保存的凭据可用时公布账号的动态发现目录；发现失败或为空时保留当前目录，首次使用以锁定的 pi-ai 静态目录兜底，设置页可主动刷新。这不证明单个模型已获服务端调用权限。`resolveModel()` 报告上下文、输入类型及该型号实际可发送的推理档位；支持 Medium 时将它声明为插件默认档位，直接调用适配器而未指定档位时也发送 Medium，显式选择优先。Web profile 的默认型号在其 `agent-default-model` 配置中设为 `gpt-5.6-terra`，不在插件内改写其他 profile 的默认选择。Minimal 若映射为 Low 则不重复呈现，"off" 若仅省略参数而不能关闭服务端思考则不呈现。`prepareCall()` 绑定目录与实际请求使用的同一代适配器状态，避免登录或配置变化让模型元数据与请求目标不一致。
 
-`stream()` 必须遵守 DSH `StreamChunk` 规则：usage 在 finish 前、finish 后不再发块；工具参数保留原始 JSON；取消传播到提供商流；提供商错误作为终止结果；请求附带 DSH 所要求的归因标头。图像或 provider-native replay 如不能在首版正确实现，必须声明为不支持并拒绝，不因目录宣称能力而悄悄降级。模型请求不可借 `OPENAI_API_KEY` 或原有 `llm-pi-ai` 账户回退，以免误用另一计费身份。
+`stream()` 必须遵守 DSH `StreamChunk` 规则：usage 在 finish 前、finish 后不再发块；工具参数保留原始 JSON；取消传播到提供商流；提供商错误作为终止结果；请求附带 DSH 所要求的归因标头。图片输入按模型目录中的 `input` 声明，用户和工具结果图片通过 Host 附件服务读取并转换为 pi-ai 原生图片块，采用 DSH 的确定性预览与历史卸载规则；真实账号识图仍需独立验收。不支持的图片角色及 provider-native replay 必须明确拒绝，不因目录宣称能力而悄悄降级。模型请求不可借 `OPENAI_API_KEY` 或原有 `llm-pi-ai` 账户回退，以免误用另一计费身份。
 
 ### 4.4 退出与禁用
 
