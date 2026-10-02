@@ -9,10 +9,12 @@ import { fileURLToPath } from 'node:url'
 import { name as hostName, apply as mountHost, inject as hostInject } from '../lib/index.js'
 import { name as imageName, apply as mountImage, inject as imageInject } from '../lib/imagegen.js'
 import { name as controlName, apply as mountControl, inject as controlInject } from '../lib/model-control.js'
-import { evaluatePluginCompatibility, getDshRuntimeVersion, readPluginMeta } from '../../deepseek-harness/packages/boot/app-boot/lib/index.js'
-import { apply as mountTypert, inject as typertInject } from '../../deepseek-harness/packages/typert/registry/lib/types/client/index.js'
-import { SlotRegistry } from '../../deepseek-harness/packages/client/ui-renderer/lib/types/client/registry.js'
-import { apply as mountGateway, inject as gatewayInject } from '../../deepseek-harness/packages/api/gateway/lib/types/client/index.js'
+import { evaluatePluginCompatibility, getDshRuntimeVersion, readPluginMeta } from '@deepseek-ai/dsh-app-boot'
+import { loadBrowserModule } from './load-browser-module.mjs'
+
+const { apply: mountTypert, inject: typertInject } = loadBrowserModule('@deepseek-ai/dsh-typert-registry')
+const { SlotRegistry } = loadBrowserModule('@deepseek-ai/dsh-client-ui-renderer')
+const { apply: mountGateway, inject: gatewayInject } = loadBrowserModule('@deepseek-ai/dsh-api-gateway')
 
 const packageName = '@h2mzzz/dsh-openai-subscription'
 const metadata = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
@@ -50,7 +52,7 @@ if (readFileSync(new URL('../lib/index.js', import.meta.url), 'utf8').includes('
 // (for example `codex-auth.js`) that each Host entry imports, and a file the
 // tarball omits makes the whole Bundle fail to load with ERR_MODULE_NOT_FOUND.
 // Inspect the real `npm pack` output instead of the working tree.
-const pack = spawnSync('npm', ['pack', '--dry-run', '--json'], {
+const pack = spawnSync('npm', ['pack', '--ignore-scripts', '--dry-run', '--json'], {
   cwd: fileURLToPath(new URL('..', import.meta.url)), encoding: 'utf8',
 })
 if (pack.status !== 0) throw new Error(`npm pack --dry-run failed: ${pack.stderr.trim()}`)
@@ -154,7 +156,7 @@ globalThis.window = {
 }
 await import('../lib/client.js')
 if (clientContribution?.id !== packageName) throw new Error('Built Client did not register its ModuleLoader factory')
-const clientRequire = createRequire(new URL('../../deepseek-harness/packages/client/ui-renderer/package.json', import.meta.url))
+const clientRequire = createRequire(import.meta.url)
 const React = clientRequire('react')
 const renderToStaticMarkup = clientRequire('react-dom/server').renderToStaticMarkup
 const buttons = []

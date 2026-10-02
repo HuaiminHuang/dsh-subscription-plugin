@@ -15,7 +15,7 @@
 
 ## 0.1.1 兼容性迁移
 
-本次对齐 DSH `0.2.0-rc.2`，不声明尚未核查的 `0.2.0` 正式版或后续版本兼容。插件版本更新为 `0.1.1`，所有 DSH peer 精确锁定到此候选版；pi-ai peer 更新到 `0.87.1`。开发依赖与其他 DSH 本地 link 一致，链接到参考检出中 `llm-pi-ai` 使用的补丁版 pi-ai；须先准备该参考检出的依赖。
+本次对齐 DSH `0.2.0-rc.2`，不声明尚未核查的 `0.2.0` 正式版或后续版本兼容。插件版本更新为 `0.1.1`，所有 DSH peer 精确锁定到此候选版；pi-ai peer 更新到 `0.87.1`。开发依赖现使用 npm 固定版本，不依赖本地 link。pi-ai 的同一补丁随源码保存于 `patches/pi-ai-0.87.1.patch`，由 `pnpm-workspace.yaml` 应用；补丁哈希保持表中锁定值。
 
 与旧基线相比，授权、凭据、LLM、Typert 及设置槽位核心源码未变。模型选择与会话 UI 有新增行为，插件依赖的 `ModelSelectInjected` 槽位契约未变。检查范围包括新版依赖下的类型检查、单元测试、构建包预检和 Host/Client 注册撤销；新版独立源码快照构建的 tarball 另经隔离 Web profile 的 DSH CLI 安装及实际 Loader/ToolRuntime/SkillRegistry 挂载、独立开关和卸载检查，使用合成认证与模拟网络/存储。Desktop、真实账号登录/刷新/调用和完整浏览器组合仍未验证，Client 平台声明继续为 Web。
 

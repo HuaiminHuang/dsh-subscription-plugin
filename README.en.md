@@ -79,3 +79,22 @@ See the [release guide](docs/RELEASING.md) for build and installation instructio
 This is an independent community plugin, not an official DeepSeek or OpenAI product.
 
 The current version `0.1.1` targets DSH `0.2.0-rc.2` and its patched pi-ai `0.87.1`. The release scope is limited to Ubuntu / Web; Desktop and real-account end-to-end flows remain unverified. Older plugin releases pin DSH `0.1.7-rc.2` and fail the new runtime version preflight.
+
+Git source installation is supported by the current source change (the old `v0.1.1` tag does not include it):
+
+```sh
+dsh plugin --profile web add github:HuaiminHuang/dsh-subscription-plugin#codex/github-prepare
+```
+
+The self-contained `prepare` builds Host, Client, Typert and declarations without a DSH source checkout. If pnpm requires build approval, copy the exact key printed in its error (including the Git source and commit) into the target profile's `pnpm-workspace.yaml` and retry. If pnpm switches to a GitHub download source and reports another key, retain the existing entry and add that key too. A package-name-only key is insufficient for Git prepare in pnpm 11.7:
+
+```yaml
+allowBuilds:
+  "<exact key printed by pnpm>": true
+  "@google/genai": false
+  protobufjs: false
+```
+
+The pi-ai dependencies `@google/genai` and `protobufjs` do not need installation scripts for this Codex plugin; deny them explicitly as this repository already does.
+
+This permits the plugin's build code to execute during installation. Pin a verified commit by appending `#<commit>` to the Git spec. The package remains private and is not published to the npm registry.

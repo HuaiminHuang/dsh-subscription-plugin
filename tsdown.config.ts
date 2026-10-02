@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 import { defineConfig } from 'tsdown'
 import { transform } from 'lightningcss'
-import { typertPlugin } from '@deepseek-ai/dsh-typert-generator/tsdown'
+import { standardDecorators } from './scripts/standard-decorators.ts'
 
 const PACKAGE_ID = '@h2mzzz/dsh-openai-subscription'
 const clientExternals = new Set(['react', 'react-dom', 'react/jsx-runtime', '@deepseek-ai/dsh-client-ui-primitives'])
@@ -65,9 +65,8 @@ export default defineConfig([
     outDir: 'lib', format: ['esm'], platform: 'node', target: 'es2024',
     fixedExtension: false, dts: false, clean: false,
     outputOptions: { chunkFileNames: '[name].js' },
-    // Lowers standard decorators; reflection files remain explicit because the
-    // upstream generator intentionally scans only its own workspace packages.
-    plugins: [typertPlugin({ mode: 'package', faces: ['host'] })],
+    // Reflection descriptors are package-owned; only decorator lowering is needed.
+    plugins: [standardDecorators],
   },
   {
     entry: { client: 'src/client/index.ts' },
