@@ -52,9 +52,13 @@ if (readFileSync(new URL('../lib/index.js', import.meta.url), 'utf8').includes('
 // (for example `codex-auth.js`) that each Host entry imports, and a file the
 // tarball omits makes the whole Bundle fail to load with ERR_MODULE_NOT_FOUND.
 // Inspect the real `npm pack` output instead of the working tree.
-const pack = spawnSync('npm', ['pack', '--ignore-scripts', '--dry-run', '--json'], {
+const pack = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['pack', '--ignore-scripts', '--dry-run', '--json'], {
   cwd: fileURLToPath(new URL('..', import.meta.url)), encoding: 'utf8',
+  // Windows command shims require cmd.exe; all arguments here are fixed literals.
+  shell: process.platform === 'win32',
 })
+if (pack.error !== undefined) throw pack.error
+if (pack.signal !== null) throw new Error(`npm pack terminated by ${pack.signal}`)
 if (pack.status !== 0) throw new Error(`npm pack --dry-run failed: ${pack.stderr.trim()}`)
 const packedFiles = new Set(JSON.parse(pack.stdout)[0].files.map(entry => entry.path))
 const builtModules = readdirSync(new URL('../lib', import.meta.url))
