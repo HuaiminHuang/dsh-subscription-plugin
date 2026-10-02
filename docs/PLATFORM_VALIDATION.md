@@ -7,8 +7,9 @@ Cross-platform code and CI do not expand the shipped Desktop support claim.
 
 `.github/workflows/ci.yml` runs typecheck, tests, built-package checks,
 `npm pack --dry-run`, and whitespace checks on Ubuntu, Windows and macOS.
-It uses synthetic auth and makes no real account requests. Remote CI results
-remain pending until the workflow runs on GitHub.
+It uses synthetic auth and makes no real account requests. The first three-platform run passed for code commit `ba8c0e1`:
+https://github.com/HuaiminHuang/dsh-subscription-plugin/actions/runs/36988985409
+Always check the workflow result for the exact commit being reviewed.
 
 Path tests cover source/built layouts, Windows drives and UNC URLs, spaces,
 Unicode directory names, CRLF Skill text and stable CSS identifiers.
