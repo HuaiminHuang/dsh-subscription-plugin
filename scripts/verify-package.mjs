@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { name as hostName, apply as mountHost, inject as hostInject } from '../lib/index.js'
 import { name as imageName, apply as mountImage, inject as imageInject } from '../lib/imagegen.js'
 import { name as controlName, apply as mountControl, inject as controlInject } from '../lib/model-control.js'
-import { readPluginMeta } from '../../deepseek-harness/packages/boot/app-boot/lib/index.js'
+import { evaluatePluginCompatibility, getDshRuntimeVersion, readPluginMeta } from '../../deepseek-harness/packages/boot/app-boot/lib/index.js'
 import { apply as mountTypert, inject as typertInject } from '../../deepseek-harness/packages/typert/registry/lib/types/client/index.js'
 import { SlotRegistry } from '../../deepseek-harness/packages/client/ui-renderer/lib/types/client/registry.js'
 import { apply as mountGateway, inject as gatewayInject } from '../../deepseek-harness/packages/api/gateway/lib/types/client/index.js'
@@ -17,6 +17,17 @@ import { apply as mountGateway, inject as gatewayInject } from '../../deepseek-h
 const packageName = '@h2mzzz/dsh-openai-subscription'
 const metadata = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
+// Exercise the same version preflight used by the running DSH, before activation.
+const runtimeVersion = getDshRuntimeVersion()
+const compatibility = evaluatePluginCompatibility(metadata, {}, runtimeVersion)
+if (runtimeVersion !== '0.2.0-rc.2' || compatibility !== undefined) {
+  throw new Error(`Bundle must pass the pinned DSH 0.2.0-rc.2 preflight (runtime: ${runtimeVersion})`)
+}
+const piVersion = JSON.parse(readFileSync(new URL('../package.json', import.meta.resolve('@earendil-works/pi-ai')), 'utf8')).version
+if (piVersion !== metadata.peerDependencies['@earendil-works/pi-ai']) {
+  throw new Error('Built package validation must use the declared pi-ai version')
+}
+
 if (readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8').includes(process.cwd())) {
   throw new Error('Built Client contains a machine-specific source path')
 }

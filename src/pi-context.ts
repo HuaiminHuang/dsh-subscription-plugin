@@ -2,7 +2,7 @@ import { IMAGE_OFFLOAD_REQUIRED_CODE, LlmError, offloadedImageText, projectOfflo
 import type { GenerateOptions, ImageAttachmentAccessResolver, RequestMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { requestImageDimensions } from '@deepseek-ai/dsh-attachment'
 import type { AttachmentId, AttachmentStore, RequestImageAttachment } from '@deepseek-ai/dsh-attachment'
-import type { AssistantMessage, Context as PiContext, ImageContent, Message as PiMessage, TextContent, Tool } from '@earendil-works/pi-ai'
+import type { AssistantMessage, Context as PiContext, ImageContent, JsonObject, Message as PiMessage, TextContent, Tool } from '@earendil-works/pi-ai'
 import { PI_PROVIDER_ID } from './constants.ts'
 
 /** Zero-valued history usage required by pi-ai assistant messages. */
@@ -28,10 +28,11 @@ function textOf(message: RequestMessage): string {
   return text
 }
 
-function argumentsOf(raw: string): Record<string, unknown> {
+function argumentsOf(raw: string): JsonObject {
   try {
+    // JSON.parse without a reviver yields JSON values; only the object root is accepted.
     const value: unknown = JSON.parse(raw)
-    if (typeof value === 'object' && value !== null && !Array.isArray(value)) return value as Record<string, unknown>
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) return value as JsonObject
   } catch {
     // A malformed historical tool call remains representable as an empty object.
   }

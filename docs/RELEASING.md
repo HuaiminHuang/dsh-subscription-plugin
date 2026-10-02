@@ -1,13 +1,13 @@
 # 发布说明（维护者）
 
-当前版本为 `0.1.0`，首个正式 tarball 发行版，支持范围限定为兼容性基线中的 Ubuntu / Web。版本标签不代表 Desktop 或全部账号能力已验收；每版的验证范围与实验能力必须单独记录。`private: true` 保留，用于阻止意外发布到 npm registry，不影响 `npm pack` 或 GitHub Release 附件。GitHub 源码 ZIP/TAR 不含构建产物，不是可安装 Bundle。
+当前版本为 `0.1.1`，面向 DSH `0.2.0-rc.2` 的兼容性发行版，发行范围限定为 Ubuntu / Web。上一个正式 tarball 为 `0.1.0`，支持范围限定为旧基线中的 Ubuntu / Web。版本标签不代表 Desktop 或全部账号能力已验收；每版的验证范围与实验能力必须单独记录。`private: true` 保留，用于阻止意外发布到 npm registry，不影响 `npm pack` 或 GitHub Release 附件。GitHub 源码 ZIP/TAR 不含构建产物，不是可安装 Bundle。
 
-历史预发布说明见 [v0.0.2](RELEASE_NOTES_v0.0.2.md)，当前正式版说明见 [v0.1.0](RELEASE_NOTES_v0.1.0.md)。
+历史预发布说明见 [v0.0.2](RELEASE_NOTES_v0.0.2.md)，历史正式版说明见 [v0.1.0](RELEASE_NOTES_v0.1.0.md)，当前版说明见 [v0.1.1](RELEASE_NOTES_v0.1.1.md)。
 
 ## 发布前
 
 1. 验证登录生命周期、目标 DSH 的真实 Loader 组合、构建包安装与卸载。真实账号授权、模型调用和 Desktop 分别记录；未运行的检查不得写成已通过。没有验证的平台和能力不纳入正式版支持承诺。
-2. 核对 DSH `477b4f420553e8a52c2fbccc464d7561b239c443` 与固定 pi-ai 补丁。优先使用干净检出；若沿用本机参考检出，按兼容性基线审查并记录差异，不能重置用户工作。仅 Desktop 构建差异不得据此声明 Desktop 兼容。
+2. 核对 DSH `639ed015397290b3745d163aafe02ffee4aa3f84`（`0.2.0-rc.2`） 与固定 pi-ai 补丁。优先使用干净检出；若沿用本机参考检出，按兼容性基线审查并记录差异，不能重置用户工作。仅 Desktop 构建差异不得据此声明 Desktop 兼容。
 3. 同步 `package.json`、AGENTS.md、中英文 README、发布说明和附件文件名。检查 MIT LICENSE、目录与 tarball 内容，排除凭据、OAuth 回调、本机 profile 数据和诊断私有产物。
 
 ## 构建与保存

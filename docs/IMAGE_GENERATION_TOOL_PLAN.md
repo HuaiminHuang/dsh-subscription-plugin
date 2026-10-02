@@ -1,6 +1,6 @@
 # `image_gen` 工具与随包 Skill 设计计划
 
-**状态：源码实现中，未发布／未完成端到端验收。** 本文定义 `@h2mzzz/dsh-openai-subscription` 中一个**随 Bundle 默认开启、可在插件面板独立关闭**的生图功能，不改变现有 `codex-subscription` 文本模型路由的职责。技术调查、两次各自独立的真实生图证据及接口不稳定性见 [Codex CLI 生图链路调查](CODEX_IMAGEGEN_INVESTIGATION.md)。目标仅为 DSH `0.1.7-rc.2`、提交 `477b4f420553e8a52c2fbccc464d7561b239c443`，以及其补丁版 pi-ai `0.85.1`；其他版本需重查实际 API。
+**状态：源码实现中，未发布／未完成端到端验收。** 本文定义 `@h2mzzz/dsh-openai-subscription` 中一个**随 Bundle 默认开启、可在插件面板独立关闭**的生图功能，不改变现有 `codex-subscription` 文本模型路由的职责。技术调查、两次各自独立的真实生图证据及接口不稳定性见 [Codex CLI 生图链路调查](CODEX_IMAGEGEN_INVESTIGATION.md)。目标仅为 DSH `0.2.0-rc.2`、提交 `639ed015397290b3745d163aafe02ffee4aa3f84`，以及其补丁版 pi-ai `0.87.1`；其他版本需重查实际 API。
 
 **当前源码进度**：`src/imagegen/` 已实现固定端点/有界响应、单 grant 并发栅栏、文字工具结果与 `tool/result.meta` 产物引用、Session 事件核验的 `/api` Fetch 读取、随包 Skill 的登录态注册/撤销；`src/client/imagegen/` 有 keyed 工具卡片。生图模块由 `openai-subscription-imagegen` Loader 条目控制，随 Bundle 默认开启，无需 `imageGen.enabled` 设置。现有模拟测试与构建包 Client 槽位测试**不能证明**真实 Loader 组合、账号生图、图片预览/下载、重启后回放、断线重连或 Desktop GUI 正确。以下表格中的 A–D 阶段都仍需真实隔离 profile 的验收；不要改写已发布 `v0.0.2` 的能力声明。
 

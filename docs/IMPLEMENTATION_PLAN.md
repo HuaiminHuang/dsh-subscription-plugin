@@ -1,6 +1,6 @@
 # Codex 订阅插件实施计划
 
-**状态：阶段 1 开发中。** 已有独立 Bundle 骨架、Host/Client、pi-ai OAuth 桥接、独立凭据键与 `codex-subscription` 路由；构建包的 Host/Client 清单、Client 激活与槽位撤销，以及隔离 Web profile 的 Host Loader 装载/卸载已检查，但没有完成真实账号、完整浏览器 Client 组合、Desktop 或额度验证。本文记录拟交付行为和需要实验确认的接口，不是现有功能说明。核查基线为 DSH `0.1.7-rc.2` 源码和 2026-09-27 可见的 [Codex App Server 文档](https://developers.openai.com/codex/app-server)；精确提交、依赖版本和本机检出限制见[兼容性基线](COMPATIBILITY_BASELINE.md)。发布前须对实际安装版本重新核查。
+**状态：阶段 1 开发中。** 已有独立 Bundle 骨架、Host/Client、pi-ai OAuth 桥接、独立凭据键与 `codex-subscription` 路由；构建包的 Host/Client 清单、Client 激活与槽位撤销，以及隔离 Web profile 的 Host Loader 装载/卸载已检查，但没有完成真实账号、完整浏览器 Client 组合、Desktop 或额度验证。本文记录拟交付行为和需要实验确认的接口，不是现有功能说明。本次 `0.1.1` 迁移已更新类型、单元测试和构建包核查；新版 tarball 已另经隔离 Web profile 的实际 CLI/Loader 挂载、独立开关和卸载验证（合成认证、模拟网络/存储）。核查基线为 DSH `0.2.0-rc.2` 源码和 2026-09-27 可见的 [Codex App Server 文档](https://developers.openai.com/codex/app-server)；精确提交、依赖版本和本机检出限制见[兼容性基线](COMPATIBILITY_BASELINE.md)。发布前须对实际安装版本重新核查。
 
 ## 1. 目标与边界
 

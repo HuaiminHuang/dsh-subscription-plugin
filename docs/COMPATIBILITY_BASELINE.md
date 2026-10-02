@@ -4,18 +4,26 @@
 
 | 项目 | 锁定值 |
 | --- | --- |
-| DSH 提交 | `477b4f420553e8a52c2fbccc464d7561b239c443` |
-| DSH 版本 | `0.1.7-rc.2` |
-| DSH 标签描述 | `dsh-v0.1.7-rc.2` |
+| DSH 提交 | `639ed015397290b3745d163aafe02ffee4aa3f84` |
+| DSH 版本 | `0.2.0-rc.2` |
+| DSH 标签描述 | `dsh-v0.2.0-rc.2` |
 | Node.js | `26.8.2` |
 | pnpm | `11.7.0` |
-| pi-ai | `@earendil-works/pi-ai` `0.85.1`，使用 DSH 锁文件中补丁哈希 `b9bcce474fb2ac44633dff0fa722816a5bff5451b4575d5874035ea14ba70a4f` |
+| pi-ai | `@earendil-works/pi-ai` `0.87.1`，使用 DSH 锁文件中补丁哈希 `b9bcce474fb2ac44633dff0fa722816a5bff5451b4575d5874035ea14ba70a4f` |
 
 此 pi-ai 版本内置 `openai-codex` OAuth provider 和 Codex Responses 协议。插件应通过自己的凭据记录和路由使用该能力，不能占用 `llm-pi-ai/openai-codex` 记录或 DSH 官方 `openai-codex` 路由。
 
-## 本机检出状态
+## 0.1.1 兼容性迁移
 
-v0.1.0 发行核对时，本机 DSH HEAD 仍为表中固定提交，工作树有五个未提交的 Desktop 构建相关文件：
+本次对齐 DSH `0.2.0-rc.2`，不声明尚未核查的 `0.2.0` 正式版或后续版本兼容。插件版本更新为 `0.1.1`，所有 DSH peer 精确锁定到此候选版；pi-ai peer 更新到 `0.87.1`。开发依赖与其他 DSH 本地 link 一致，链接到参考检出中 `llm-pi-ai` 使用的补丁版 pi-ai；须先准备该参考检出的依赖。
+
+与旧基线相比，授权、凭据、LLM、Typert 及设置槽位核心源码未变。模型选择与会话 UI 有新增行为，插件依赖的 `ModelSelectInjected` 槽位契约未变。检查范围包括新版依赖下的类型检查、单元测试、构建包预检和 Host/Client 注册撤销；新版独立源码快照构建的 tarball 另经隔离 Web profile 的 DSH CLI 安装及实际 Loader/ToolRuntime/SkillRegistry 挂载、独立开关和卸载检查，使用合成认证与模拟网络/存储。Desktop、真实账号登录/刷新/调用和完整浏览器组合仍未验证，Client 平台声明继续为 Web。
+
+本次参考检出仍有四个 Desktop 构建相关未提交文件（下述清单前四项），未改动或重置。
+
+## 历史发行验证（0.1.0）
+
+v0.1.0 发行核对时，本机 DSH HEAD 为旧基线 `477b4f420553e8a52c2fbccc464d7561b239c443`（DSH `0.1.7-rc.2`），工作树有五个未提交的 Desktop 构建相关文件：
 
 - `apps/desktop/scripts/desktop-build-paths.d.mts`
 - `apps/desktop/scripts/desktop-build-paths.mjs`

@@ -70,13 +70,13 @@ describe('Codex reasoning effort', () => {
       messages: [], reasoningEffort: ReasoningEffortId('max') })) { /* drain */ }
     expect(calls[0]).toMatchObject({ reasoning: 'max' })
 
-    for await (const _chunk of adapter.stream({ provider: 'codex-subscription', model: 'gpt-5.4', messages: [] })) { /* drain */ }
+    for await (const _chunk of adapter.stream({ provider: 'codex-subscription', model: 'gpt-5.5', messages: [] })) { /* drain */ }
     expect(calls[1]).toMatchObject({ reasoning: 'medium' })
   })
 
   it('rejects unsupported levels before dispatch rather than letting pi-ai clamp them', async () => {
     const { adapter, calls } = fixture()
-    for (const [model, effort] of [['gpt-5.4', 'max'], ['gpt-5.6-sol', 'off'], ['gpt-6-astra', 'minimal']] as const) {
+    for (const [model, effort] of [['gpt-5.5', 'max'], ['gpt-5.6-sol', 'off'], ['gpt-6-astra', 'minimal']] as const) {
       const drain = async () => {
         for await (const _chunk of adapter.stream({ provider: 'codex-subscription', model, messages: [],
           reasoningEffort: ReasoningEffortId(effort) })) { /* drain */ }

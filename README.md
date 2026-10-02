@@ -64,6 +64,8 @@ kind: "package-bundle"
 
 关闭生图工具不影响订阅对话；关闭紧凑模型滑块会恢复原有「模型 / 推理等级」菜单，并保留已选择的思考强度与速度。停用订阅接入后，依赖登录的功能随之停止。
 
+当前版本 `0.1.1` 面向 DSH `0.2.0-rc.2`，使用其补丁版 pi-ai `0.87.1`；发行范围限定为 Ubuntu / Web；Desktop 与真实账号端到端流程未验收。旧版插件锁定 DSH `0.1.7-rc.2`，不能直接安装到新版本。
+
 ## 安装与开始使用
 
 使用构建后的 npm `.tgz` 包安装到 Web profile，将示例路径替换为实际绝对路径：
@@ -74,6 +76,6 @@ dsh plugin --profile web add /absolute/path/to/plugin.tgz
 
 安装后按 DSH 提示加载插件，在 **设置 → OpenAI** 中登录，再从会话模型选择器中选择订阅模型。GitHub 自动生成的源码压缩包不能直接作为插件安装。
 
-构建与安装说明见[发布指南](docs/RELEASING.md)，验证范围见[发布记录](docs/RELEASE_NOTES_v0.1.0.md)，技术要求见[兼容性基线](docs/COMPATIBILITY_BASELINE.md)。当前未提供订阅额度查询或重置卡功能。
+构建与安装说明见[发布指南](docs/RELEASING.md)，验证范围见[发布记录](docs/RELEASE_NOTES_v0.1.1.md)，技术要求见[兼容性基线](docs/COMPATIBILITY_BASELINE.md)。当前未提供订阅额度查询或重置卡功能。
 
 本项目是独立社区插件，非 DeepSeek 或 OpenAI 官方产品。

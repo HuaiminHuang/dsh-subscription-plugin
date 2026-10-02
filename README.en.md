@@ -74,6 +74,8 @@ dsh plugin --profile web add /absolute/path/to/plugin.tgz
 
 Load the plugin as prompted by DSH, sign in under **Settings → OpenAI**, and select a subscription model in the conversation picker. GitHub-generated source archives are not directly installable plugin packages.
 
-See the [release guide](docs/RELEASING.md) for build and installation instructions, [release notes](docs/RELEASE_NOTES_v0.1.0.md) for verification scope, and [compatibility baseline](docs/COMPATIBILITY_BASELINE.md) for technical requirements. Subscription quota lookup and reset cards are not implemented.
+See the [release guide](docs/RELEASING.md) for build and installation instructions, [release notes](docs/RELEASE_NOTES_v0.1.1.md) for verification scope, and [compatibility baseline](docs/COMPATIBILITY_BASELINE.md) for technical requirements. Subscription quota lookup and reset cards are not implemented.
 
 This is an independent community plugin, not an official DeepSeek or OpenAI product.
+
+The current version `0.1.1` targets DSH `0.2.0-rc.2` and its patched pi-ai `0.87.1`. The release scope is limited to Ubuntu / Web; Desktop and real-account end-to-end flows remain unverified. Older plugin releases pin DSH `0.1.7-rc.2` and fail the new runtime version preflight.

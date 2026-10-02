@@ -5,8 +5,8 @@
  * file, so a released DSH keeps advertising the models that were current when that
  * dependency was cut. The backend exposes the account's real catalog at
  * `GET /backend-api/codex/models`, but gates the answer by the `client_version`
- * query parameter: the installed generation (`0.85.1`) is answered with an empty
- * list. Discovery therefore replaces the catalog for this process only, and never
+ * query parameter: the previously tested generation (`0.85.1`) was answered with an empty
+ * list. This observation has not been rechecked against `0.87.1`. Discovery therefore replaces the catalog for this process only, and never
  * with an empty one — a failure keeps whatever catalog is already in use.
  */
 import type { Api, Credential, Model, ModelThinkingLevel, ThinkingLevelMap } from '@earendil-works/pi-ai'
