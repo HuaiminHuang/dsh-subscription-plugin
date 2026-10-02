@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Credential } from '@earendil-works/pi-ai'
 import { codexBaselineModels } from '../src/discovery.ts'
+import { RequestLifetime } from '../src/host/request-lifetime.ts'
 import { CodexSubscriptionController } from '../src/controller.ts'
 import type { CodexSubscriptionState } from '../src/types.ts'
 
@@ -35,7 +36,7 @@ vi.mock('../src/credential-store.ts', async (importOriginal) => ({
 function controller() {
   const registerAdapter = vi.fn(() => Object.assign(() => {}, { replace: vi.fn() }))
   const instance = Object.create(CodexSubscriptionController.prototype) as CodexSubscriptionController
-  const activeRequests = new Set<{ controller: AbortController; finished: Promise<void> }>()
+  const requests = new RequestLifetime()
   Object.assign(instance as unknown as Record<string, unknown>, {
     ctx: { credentials: { readRecord: async () => records.current }, llm: { registerAdapter } },
     // pi-ai reports models only for a provider whose auth is configured; here the
@@ -45,7 +46,7 @@ function controller() {
       getAuth: async () => undefined,
     },
     adapter: {},
-    activeRequests,
+    requests,
     fastSelections: new Set(),
     registration: undefined,
     attempt: undefined,
@@ -59,28 +60,8 @@ function controller() {
     discoveredModels: undefined,
     catalog: codexBaselineModels,
     disposed: false,
-    // Mirrors the real ownership contract: a request is registered until disposed
-    // and every registered request is aborted by sign-out.
-    openRequest: (signal?: AbortSignal) => {
-      const support = new AbortController()
-      const abort = (): void => support.abort(signal?.reason)
-      signal?.addEventListener('abort', abort, { once: true })
-      if (signal?.aborted) abort()
-      let finish!: () => void
-      const request = { controller: support, finished: new Promise<void>(resolve => { finish = resolve }) }
-      activeRequests.add(request)
-      return {
-        signal: support.signal,
-        [Symbol.dispose]: () => {
-          signal?.removeEventListener('abort', abort)
-          support.abort('Codex subscription request completed')
-          activeRequests.delete(request)
-          finish()
-        },
-      }
-    },
   })
-  return { instance, registerAdapter, activeRequests }
+  return { instance, registerAdapter }
 }
 
 const grant = {

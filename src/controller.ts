@@ -1,3 +1,6 @@
+import { RequestLifetime } from './host/request-lifetime.ts'
+import { disposeAll } from './lifecycle.ts'
+import { warnHost } from './diagnostics.ts'
 import { supportsFast } from './speed.ts'
 import type { CodexSpeedState } from './types.ts'
 import { randomUUID } from 'node:crypto'
@@ -29,11 +32,6 @@ interface Attempt {
   timedOut: boolean
 }
 
-interface ActiveRequest {
-  readonly controller: AbortController
-  readonly finished: Promise<void>
-}
-
 /** Host owner for the Codex login lifecycle, route registration, and safe Remote state. */
 export class CodexSubscriptionController extends TypertRemoteService {
   static inject = ['llm', 'credentials', 'authorization']
@@ -42,7 +40,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
   private readonly adapter: CodexSubscriptionAdapter
   private compactModelControl = false
   private readonly fastSelections = new Set<string>()
-  private readonly activeRequests = new Set<ActiveRequest>()
+  private readonly requests = new RequestLifetime()
   private registration: AdapterRegistrationHandle | undefined
   private attempt: Attempt | undefined
   private readonly instanceId = randomUUID()
@@ -95,7 +93,10 @@ export class CodexSubscriptionController extends TypertRemoteService {
   subscribeState(listener: (state: CodexSubscriptionState) => void): () => void {
     const notify = (): void => { listener(this.state) }
     this.listeners.add(notify)
-    notify()
+    try { notify() } catch (error) {
+      this.listeners.delete(notify)
+      throw error
+    }
     return () => { this.listeners.delete(notify) }
   }
 
@@ -104,22 +105,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
     if (this.disposed || this.signOutTask !== undefined) {
       throw new LlmError('Codex plugin is not accepting requests', 'NO_ADAPTER')
     }
-    const controller = new AbortController()
-    const abort = (): void => controller.abort(signal?.reason)
-    signal?.addEventListener('abort', abort, { once: true })
-    if (signal?.aborted) abort()
-    let finish!: () => void
-    const request: ActiveRequest = { controller, finished: new Promise<void>(resolve => { finish = resolve }) }
-    this.activeRequests.add(request)
-    return {
-      signal: controller.signal,
-      [Symbol.dispose]: () => {
-        signal?.removeEventListener('abort', abort)
-        controller.abort('Codex subscription request completed')
-        this.activeRequests.delete(request)
-        finish()
-      },
-    }
+    return this.requests.open(signal)
   }
 
   /** Borrow only a fresh, plugin-owned OAuth access for one Host image operation. */
@@ -294,8 +280,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
       this.ctx.authorization.cancel(CODEX_CREDENTIAL_KEY)
       this.attempt = undefined
     }
-    for (const request of this.activeRequests) request.controller.abort('Codex subscription sign-out')
-    await Promise.all([...this.activeRequests].map(request => request.finished))
+    await this.requests.abort('Codex subscription sign-out')
     // Authorization can answer "cancelled" before an orphaned provider flow
     // stops. Wait for the owned flow itself before deleting the grant.
     await Promise.allSettled([this.loginRun, this.loginTask].filter((task): task is Promise<void> => task !== undefined))
@@ -513,7 +498,9 @@ export class CodexSubscriptionController extends TypertRemoteService {
     if (this.disposed) return
     this.revision++
     this.state = Object.freeze({ ...next, compactModelControl: this.compactModelControl, instanceId: this.instanceId, revision: this.revision })
-    for (const listener of this.listeners) listener()
+    for (const listener of this.listeners) {
+      try { listener() } catch { warnHost(this.ctx, 'state-listener-failed') }
+    }
   }
 
   private async dispose(): Promise<void> {
@@ -525,13 +512,15 @@ export class CodexSubscriptionController extends TypertRemoteService {
       this.attempt.controller.abort()
       this.attempt = undefined
     }
-    this.ctx.authorization.cancel(CODEX_CREDENTIAL_KEY)
-    this.registration?.()
+    const requestsDone = this.requests.abort('Codex subscription plugin unloaded')
+    const registration = this.registration
     this.registration = undefined
-    for (const request of this.activeRequests) request.controller.abort('Codex subscription plugin unloaded')
     this.listeners.clear()
-    await Promise.allSettled([this.loginRun, this.loginTask, this.signOutTask, ...this.pendingRefreshes,
-      ...[...this.activeRequests].map(request => request.finished)]
-      .filter((task): task is Promise<void> | Promise<CodexSubscriptionState> => task !== undefined))
+    await disposeAll([
+      () => registration?.(),
+      () => this.ctx.authorization.cancel(CODEX_CREDENTIAL_KEY),
+      () => Promise.allSettled([this.loginRun, this.loginTask, this.signOutTask, ...this.pendingRefreshes, requestsDone]
+        .filter((task): task is Promise<unknown> => task !== undefined)),
+    ])
   }
 }

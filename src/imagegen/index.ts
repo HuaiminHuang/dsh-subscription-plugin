@@ -5,6 +5,8 @@ import type { CodexSubscriptionController } from '../controller.ts'
 import { imageResponse } from './artifact.ts'
 import { createImageTool } from './tool.ts'
 import { imageSkill } from './skill.ts'
+import { disposeAll } from '../lifecycle.ts'
+import { warnHost } from '../diagnostics.ts'
 
 export function mountImageFeature(ctx: Context, controller: CodexSubscriptionController): () => Promise<void> {
   const owner = new AbortController()
@@ -31,46 +33,43 @@ export function mountImageFeature(ctx: Context, controller: CodexSubscriptionCon
         return [...observation.events]
       },
       readImage: (ref, signal) => ctx.attachments.readImage(ref, signal),
+      diagnose: category => warnHost(ctx, `image-preview-${category}`),
     }),
   })
   let unsubscribe: () => void
   try {
     unsubscribe = controller.subscribeState(state => {
       if (closed) return
-      try {
-        if (state.status === 'signed-in') {
-          if (removeTool === undefined) {
-            removeTool = ctx.tools.register(imageTool)
-            removeSkill = ctx.skills.register(imageSkill())
-          }
-        } else {
-          removeSkill?.()
-          removeSkill = undefined
-          removeTool?.()
-          removeTool = undefined
+      if (state.status === 'signed-in') {
+        if (removeTool === undefined) {
+          try { removeTool = ctx.tools.register(imageTool) }
+          catch { warnHost(ctx, 'image-tool-registration-failed'); return }
         }
-      } catch {
-        // An optional image contribution cannot turn a valid text login into an error.
-        try { removeSkill?.() } catch { /* Preserve the text login. */ }
+        if (removeSkill === undefined) {
+          try { removeSkill = ctx.skills.register(imageSkill()) }
+          catch { warnHost(ctx, 'image-skill-registration-failed') }
+        }
+      } else {
+        const skill = removeSkill
+        const tool = removeTool
         removeSkill = undefined
-        try { removeTool?.() } catch { /* Preserve the text login. */ }
         removeTool = undefined
-        try { (ctx.get('logger') as { warn?: (text: string) => void } | undefined)?.warn?.('codex image tool registration failed') }
-        catch { /* A diagnostic must not escape into controller.publish(). */ }
+        for (const remove of [skill, tool]) {
+          try { remove?.() } catch { warnHost(ctx, 'image-registration-cleanup-failed') }
+        }
       }
     })
   } catch (error) {
-    void route()
+    void route().catch(() => warnHost(ctx, 'image-route-cleanup-failed'))
     throw error
   }
   return async () => {
     if (closed) return
     closed = true
-    unsubscribe()
-    removeSkill?.()
-    removeTool?.()
     owner.abort('Image tool unloaded')
-    await Promise.allSettled([...tasks])
-    await route()
+    await disposeAll([
+      unsubscribe, () => removeSkill?.(), () => removeTool?.(),
+      () => Promise.allSettled([...tasks]), route,
+    ])
   }
 }

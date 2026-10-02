@@ -6,7 +6,7 @@ const attachment = {
 }
 const event = (overrides: Record<string, unknown> = {}) => ({
   type: 'tool/result', data: {
-    message: { callId: 'call-1', isError: false, content: [{ type: 'text', text: 'Generated one image. It is available in this tool result.' }] },
+    message: { toolCallId: 'call-1', isError: false, content: [{ type: 'text', text: 'Generated one image. It is available in this tool result.' }] },
     meta: { image: attachment, sessionId: 'example' }, ...overrides,
   },
 })
@@ -17,7 +17,7 @@ const joined = 'call_22weLBOZWrmCKfcfKuf0AoIR|fc_0a8c9f33f26f3a30016abe2f194f808
 describe('image artifact delivery', () => {
   const request = new Request('http://localhost/api/codex-subscription/image?sessionId=example&callId=call-1')
 
-  it('serves only a matching successful durable tool result, without using the ID as authorization', async () => {
+  it('serves a DSH toolCallId result matched to its call event, without using the ID as authorization', async () => {
     const readImage = vi.fn(async () => ({ ref: attachment, data: new Uint8Array([1, 2, 3]) }))
     const response = await imageResponse(request, {
       events: async () => [call, event()], readImage,
@@ -33,7 +33,7 @@ describe('image artifact delivery', () => {
     const joinedCall = { type: 'tool/call', data: { callId: joined, name: 'codex_generate_image' } }
     const response = await imageResponse(
       new Request(`http://localhost/api/codex-subscription/image?sessionId=example&callId=${encodeURIComponent(joined)}`),
-      { events: async () => [joinedCall, event({ message: { callId: joined, isError: false, content: [{ type: 'text', text: 'Generated one image. It is available in this tool result.' }] } })], readImage },
+      { events: async () => [joinedCall, event({ message: { toolCallId: joined, isError: false, content: [{ type: 'text', text: 'Generated one image. It is available in this tool result.' }] } })], readImage },
     )
     expect(response.status).toBe(200)
     expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([4, 5, 6])
@@ -52,11 +52,13 @@ describe('image artifact delivery', () => {
   it.each([
     [[], 'no result'],
     [[event()], 'no matching tool call'],
-    [[call, event({ message: { callId: 'call-1', isError: true }, meta: { image: attachment } })], 'failed result'],
-    [[call, event({ message: { callId: 'another', isError: false }, meta: { image: attachment } })], 'another call'],
+    [[call, event({ message: { toolCallId: 'call-1', isError: true }, meta: { image: attachment } })], 'failed result'],
+    [[call, event({ message: { toolCallId: 'another', isError: false, content: [{ type: 'text', text: 'Generated one image. It is available in this tool result.' }] } })], 'another call'],
+    [[call, event({ message: { callId: 'call-1', isError: false, content: [{ type: 'text', text: 'Generated one image. It is available in this tool result.' }] } })], 'non-contract callId field'],
+    [[call, event({ message: { callId: 'call-1', toolCallId: 'another', isError: false, content: [{ type: 'text', text: 'Generated one image. It is available in this tool result.' }] } })], 'forged callId cannot override toolCallId'],
     [[call, event({ meta: { image: { ...attachment, attachmentId: '../../private' } } })], 'invalid reference'],
     [[call, event({ meta: { image: attachment, sessionId: 'another' } })], 'another session'],
-    [[call, event({ message: { callId: 'call-1', isError: false, content: [{ type: 'text', text: 'Policy replaced this result' }] } })], 'replaced result'],
+    [[call, event({ message: { toolCallId: 'call-1', isError: false, content: [{ type: 'text', text: 'Policy replaced this result' }] } })], 'replaced result'],
   ])('denies %s', async (events) => {
     const readImage = vi.fn()
     const response = await imageResponse(request, { events: async () => events, readImage })
@@ -71,4 +73,17 @@ describe('image artifact delivery', () => {
     expect(response.status).toBe(404)
     expect(await response.text()).not.toContain('secret')
   })
+})
+
+
+it('reports a fixed failure stage without exposing storage error details', async () => {
+  const diagnose = vi.fn()
+  const response = await imageResponse(new Request('http://localhost/api/codex-subscription/image?sessionId=example&callId=call-1'), {
+    events: async () => [call, event()],
+    readImage: async () => { throw new Error('private storage path and account details') },
+    diagnose,
+  })
+  expect(response.status).toBe(404)
+  expect(diagnose).toHaveBeenCalledWith('attachment')
+  expect(await response.text()).toBe('not found')
 })

@@ -5,6 +5,7 @@ import { IMAGE_SUCCESS_TEXT } from './contract.ts'
 interface Event { readonly type: string; readonly data: unknown }
 
 export interface ImageSource {
+  diagnose?(category: 'request' | 'session' | 'result' | 'attachment'): void
   events(sessionId: string, signal: AbortSignal): Promise<readonly Event[]>
   readImage(ref: ImageAttachmentRef, signal: AbortSignal): Promise<{ readonly ref: ImageAttachmentRef; readonly data: Uint8Array }>
 }
@@ -35,7 +36,7 @@ export function resultImage(events: readonly Event[], sessionId: string, callId:
     }
     if (event.type !== 'tool/result' || !called) continue
     const message = object(data?.message)
-    if (message?.callId !== callId) continue
+    if (message?.toolCallId !== callId) continue
     // No second result may override a prior failure or link a different image.
     const meta = object(data?.meta)
     const content = message.content
@@ -49,7 +50,11 @@ export function resultImage(events: readonly Event[], sessionId: string, callId:
 
 /** Runs behind Connection's Host/Origin + browser-auth fence, not a raw WebServer route. */
 export async function imageResponse(request: Request, source: ImageSource): Promise<Response> {
-  const notFound = (): Response => new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
+  let phase: 'request' | 'session' | 'result' | 'attachment' = 'request'
+  const notFound = (): Response => {
+    try { source.diagnose?.(phase) } catch { /* Diagnostics cannot change image delivery. */ }
+    return new Response('not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
+  }
   try {
     if (request.method !== 'GET' && request.method !== 'HEAD') return notFound()
     const url = new URL(request.url)
@@ -60,9 +65,12 @@ export async function imageResponse(request: Request, source: ImageSource): Prom
       // `|` joins the gateway call ID to the upstream provider function-call ID,
       // so a real recorded call ID must survive this route's shape check.
       || !/^[a-zA-Z0-9_:|-]{1,128}$/.test(callId)) return notFound()
+    phase = 'session'
     const events = await source.events(sessionId, request.signal)
+    phase = 'result'
     const ref = resultImage(events, sessionId, callId)
     if (ref === undefined) return notFound()
+    phase = 'attachment'
     const stored = await source.readImage(ref, request.signal)
     if (stored.ref.attachmentId !== ref.attachmentId || stored.data.byteLength !== ref.bytes
       || stored.data.byteLength > 20_000_000) return notFound()

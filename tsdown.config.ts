@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 import { defineConfig } from 'tsdown'
 import { transform } from 'lightningcss'
+import { cssTagId } from './scripts/css-tag-id.ts'
 import { standardDecorators } from './scripts/standard-decorators.ts'
 
 const PACKAGE_ID = '@h2mzzz/dsh-openai-subscription'
@@ -23,7 +24,7 @@ const clientCssPlugin = {
     const compiled = transform({ filename: file, code: await readFile(file), cssModules: { pattern: '[hash]_[local]' }, minify: true })
     const classes: Record<string, string> = {}
     for (const [local, value] of Object.entries(compiled.exports ?? {})) classes[local] = value.name
-    const tagId = `${PACKAGE_ID}/${file.split('/').at(-1) ?? 'style'}`
+    const tagId = cssTagId(PACKAGE_ID, file)
     return [
       `const css = ${JSON.stringify(compiled.code.toString())}`,
       `const tagId = ${JSON.stringify(tagId)}`,

@@ -14,6 +14,8 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type { CodexSubscriptionState } from '../types.ts'
 import remote from '../remote.ts'
+import { StateStore } from './state-store.ts'
+import { disposeAll } from '../lifecycle.ts'
 import { CodexSubscriptionSection, type CodexSubscriptionOperations } from './CodexSubscriptionSection.tsx'
 import { install as installStyles } from './CodexSubscriptionSection.module.css'
 import { en, zh } from './locales.ts'
@@ -22,24 +24,6 @@ import { install as installImageStyles } from './imagegen/ToolImageView.module.c
 import { en as imageEn, zh as imageZh } from './imagegen/locales.ts'
 
 export const inject = ['remote', 'slots', 'locale']
-
-class StateStore {
-  private readonly listeners = new Set<() => void>()
-  private state: CodexSubscriptionState = { status: 'checking', models: [] }
-
-  getSnapshot = (): CodexSubscriptionState => this.state
-  subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener)
-    return () => { this.listeners.delete(listener) }
-  }
-  set(state: CodexSubscriptionState): void {
-    if (state.instanceId !== undefined && state.instanceId === this.state.instanceId
-      && state.revision !== undefined && this.state.revision !== undefined
-      && state.revision < this.state.revision) return
-    this.state = state
-    for (const listener of this.listeners) listener()
-  }
-}
 
 function result<T>(response: RemoteResult<T>): T {
   if (response.ok) return response.value
@@ -60,9 +44,9 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   })
   void Promise.resolve(imageView).catch(() => { /* A missing optional Tool view must not break settings. */ })
   const store = new StateStore()
-  const call = async <T>(operation: () => Promise<RemoteResult<T>>): Promise<T> => {
+  const call = async (operation: () => Promise<RemoteResult<CodexSubscriptionState>>): Promise<CodexSubscriptionState> => {
     const next = result(await operation())
-    store.set(next as CodexSubscriptionState)
+    store.set(next)
     return next
   }
   // The namespace is installed by $mount above. Only the child that declares
@@ -127,23 +111,15 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     }, ModelControl))
   })
   void Promise.resolve(modelUi).catch(() => { /* Optional model owner must not break settings. */ })
+  const dispose = () => disposeAll([
+    () => modelUi.dispose(), disposeModelStyles, () => ui.dispose(),
+    () => imageView.dispose(), disposeImageStyles, disposeStyles, disposeRemote,
+  ])
   try { await ui } catch (error) {
-    await modelUi.dispose()
-    disposeModelStyles()
-    await ui.dispose()
-    await imageView.dispose()
-    disposeImageStyles()
-    disposeStyles()
-    await disposeRemote()
+    try { await dispose() } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], 'Client activation and cleanup failed')
+    }
     throw error
   }
-  return async () => {
-    await modelUi.dispose()
-    disposeModelStyles()
-    await ui.dispose()
-    await imageView.dispose()
-    disposeImageStyles()
-    disposeStyles()
-    await disposeRemote()
-  }
+  return dispose
 }

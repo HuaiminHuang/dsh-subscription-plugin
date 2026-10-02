@@ -49,3 +49,47 @@ describe('opt-in image feature owner', () => {
     expect(unroute).toHaveBeenCalledTimes(1)
   })
 })
+
+
+it('keeps the tool when Skill registration fails and retries the Skill on a later notification', async () => {
+  const untool = vi.fn()
+  const unskill = vi.fn()
+  const tools = { register: vi.fn(() => untool) }
+  const skills = { register: vi.fn().mockImplementationOnce(() => { throw new Error('missing Skill') }).mockReturnValue(unskill) }
+  const warning = vi.fn()
+  let notify!: (state: { status: string }) => void
+  const dispose = mountImageFeature({
+    tools, skills, get: () => ({ warn: warning }),
+    connection: { fetch: { register: () => async () => {} } },
+    attachments: { saveImages: vi.fn(), readImage: vi.fn() }, sessionQuery: { observeSession: vi.fn() },
+  } as never, { withImageAuth: vi.fn(), subscribeState: (listener: typeof notify) => {
+    notify = listener; notify({ status: 'signed-in' }); return vi.fn()
+  } } as never)
+  try {
+    expect(untool).not.toHaveBeenCalled()
+    expect(warning).toHaveBeenCalledWith('codex subscription: image-skill-registration-failed')
+    notify({ status: 'signed-in' })
+    expect(tools.register).toHaveBeenCalledOnce()
+    expect(skills.register).toHaveBeenCalledTimes(2)
+  } finally { await dispose() }
+  expect(untool).toHaveBeenCalledOnce()
+  expect(unskill).toHaveBeenCalledOnce()
+})
+
+it('still removes its route when a Tool disposer throws', async () => {
+  const route = vi.fn(async () => {})
+  const unsubscribe = vi.fn()
+  const dispose = mountImageFeature({
+    tools: { register: () => () => { throw new Error('tool cleanup failed') } },
+    skills: { register: () => vi.fn() },
+    connection: { fetch: { register: () => route } },
+    attachments: { saveImages: vi.fn(), readImage: vi.fn() }, sessionQuery: { observeSession: vi.fn() },
+  } as never, { withImageAuth: vi.fn(), subscribeState: (listener: (state: { status: string }) => void) => {
+    listener({ status: 'signed-in' }); return unsubscribe
+  } } as never)
+  await expect(dispose()).rejects.toBeInstanceOf(AggregateError)
+  expect(route).toHaveBeenCalledOnce()
+  expect(unsubscribe).toHaveBeenCalledOnce()
+  await dispose()
+  expect(route).toHaveBeenCalledOnce()
+})
