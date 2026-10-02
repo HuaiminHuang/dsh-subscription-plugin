@@ -1,3 +1,4 @@
+import { fetchUsage, UsageQueryError, UsageReader } from './usage.ts'
 import { RequestLifetime } from './host/request-lifetime.ts'
 import { disposeAll } from './lifecycle.ts'
 import { warnHost } from './diagnostics.ts'
@@ -13,7 +14,7 @@ import { LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
 import type { CodexImageContext } from './pi-context.ts'
 import type { AdapterRegistrationHandle } from '@deepseek-ai/dsh-llm'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import type { CodexLoginMethod, CodexSubscriptionState } from './types.ts'
+import type { CodexLoginMethod, CodexSubscriptionState, CodexUsageSnapshot } from './types.ts'
 import { CodexSubscriptionAdapter } from './adapter.ts'
 import { CODEX_CREDENTIAL_KEY, PI_PROVIDER_ID, PROVIDER_ID } from './constants.ts'
 import { codexCredentialStore, isolatedAuthContext } from './credential-store.ts'
@@ -57,6 +58,8 @@ export class CodexSubscriptionController extends TypertRemoteService {
   private catalog: readonly Model<Api>[] = codexBaselineModels
   /** Discovery transport; a Host keeps the global fetch, tests inject a stub. */
   private readonly discoveryFetch: typeof fetch = (input, init) => fetch(input, init)
+  private readonly usage = new UsageReader(() => this.withSubscriptionAuth(
+    AbortSignal.timeout(15_000), (access, signal) => fetchUsage(fetch, access, signal)).catch(() => { throw new UsageQueryError() }))
   private disposed = false
   private loginRun: Promise<unknown> | undefined
   private loginTask: Promise<void> | undefined
@@ -108,8 +111,13 @@ export class CodexSubscriptionController extends TypertRemoteService {
     return this.requests.open(signal)
   }
 
-  /** Borrow only a fresh, plugin-owned OAuth access for one Host image operation. */
-  async withImageAuth<T>(signal: AbortSignal, run: (access: string, signal: AbortSignal) => Promise<T>): Promise<T> {
+  /** Image owner compatibility entry; the shared helper also serves read-only quota requests. */
+  withImageAuth<T>(signal: AbortSignal, run: (access: string, signal: AbortSignal) => Promise<T>): Promise<T> {
+    return this.withSubscriptionAuth(signal, run)
+  }
+
+  /** Borrow fresh plugin-owned OAuth for one Host operation under request teardown ownership. */
+  private async withSubscriptionAuth<T>(signal: AbortSignal, run: (access: string, signal: AbortSignal) => Promise<T>): Promise<T> {
     using request = this.openRequest(signal)
     if (this.state.status !== 'signed-in') throw new LlmError('Codex subscription is not signed in', 'NO_ADAPTER')
     const resolved = await this.models.getAuth(PI_PROVIDER_ID, { signal: request.signal })
@@ -120,6 +128,26 @@ export class CodexSubscriptionController extends TypertRemoteService {
     const result = await run(resolved.auth.apiKey, request.signal)
     request.signal.throwIfAborted()
     return result
+  }
+
+  /** Read a cached account limit snapshot; failures never invalidate model login. */
+  @Remote
+  getUsage(): Promise<CodexUsageSnapshot> {
+    this.assertUsageAvailable()
+    return this.usage.read()
+  }
+
+  /** Explicitly refresh limits, sharing any already-running request. */
+  @Remote
+  refreshUsage(): Promise<CodexUsageSnapshot> {
+    this.assertUsageAvailable()
+    return this.usage.read(true)
+  }
+
+  private assertUsageAvailable(): void {
+    if (this.disposed || this.signOutTask !== undefined || this.state.status !== 'signed-in') {
+      throw new LlmError('Sign in before reading subscription limits', 'NO_ADAPTER')
+    }
   }
 
   /** Owned by the optional compact-control Loader entry, never a Remote setting. */
@@ -154,6 +182,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
     attempt.timer.unref()
     this.attempt = attempt
     this.discoveryDone = false
+    this.usage.reset()
     this.publish({ status: 'signing-in', attemptId: attempt.id, method, models: [] })
     const task = this.ctx.authorization.begin({
       key: CODEX_CREDENTIAL_KEY,
@@ -272,6 +301,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
   }
 
   private async finishSignOut(): Promise<CodexSubscriptionState> {
+    this.usage.reset()
     this.refreshEpoch++
     this.discoveryDone = false
     if (this.attempt !== undefined) {
@@ -506,6 +536,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
   private async dispose(): Promise<void> {
     this.disposed = true
     this.fastSelections.clear()
+    this.usage.reset()
     this.refreshEpoch++
     if (this.attempt !== undefined) {
       clearTimeout(this.attempt.timer)

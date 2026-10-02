@@ -63,7 +63,9 @@ Bundle 装载后页面可见，即使没有 Codex 凭据也能点击登录。Hos
 
 退出只删除插件自有 OAuth 记录；撤销后续 Codex 路由并通知选择器，不删除原 API Key、Codex CLI 凭据、其它插件凭据或会话历史。进行中的模型请求和退出的先后策略须在实现前定为明确的取消或完成规则，并通过竞态测试验证。禁用 Bundle 撤销 Remote、UI slot、监听器和路由；存储凭据是否保留供再次启用由产品设置明确说明，默认不以“停用”暗中注销。
 
-## 5. 额度数据：必须先验证的决定
+## 5. 额度数据：来源与验证范围
+
+2026-10-03 更新：用户明确授权后，同一插件 OAuth 对 `wham/usage` 的真实查询返回 200，实测 `rate_limit.primary_window` 和 `secondary_window` 包含 `used_percent`、`limit_window_seconds`、`reset_at`。当前实现采用线路 A，仅投影窗口与查询时间；Host 请求超时 15 秒、合并并发请求、缓存 60 秒，登出/卸载取消请求并清除缓存。真实接口与生产解析已核查，但这不补齐此前未完成的登录、模型调用或跨平台验收。reset 卡仍不交付。
 
 **已知缺口：** `LlmAdapter` 的 `TokenUsage` 是单次请求计数，不含账户套餐、五小时或每周窗口、reset 卡。不能通过扩充 `TokenUsage` 假造账户额度接口，也不能复用 DeepSeek 账户余额 Remote。
 

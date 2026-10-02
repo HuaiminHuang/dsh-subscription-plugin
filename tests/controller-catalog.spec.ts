@@ -1,3 +1,4 @@
+import { UsageReader } from '../src/usage.ts'
 import { describe, expect, it, vi } from 'vitest'
 import type { Credential } from '@earendil-works/pi-ai'
 import { codexBaselineModels } from '../src/discovery.ts'
@@ -59,6 +60,7 @@ function controller() {
     discoveryDone: false,
     discoveredModels: undefined,
     catalog: codexBaselineModels,
+    usage: new UsageReader(async () => ({ windows: [], checkedAt: new Date().toISOString() })),
     disposed: false,
   })
   return { instance, registerAdapter }

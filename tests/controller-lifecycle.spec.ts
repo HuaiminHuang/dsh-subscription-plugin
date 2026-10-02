@@ -1,3 +1,4 @@
+import { UsageReader } from '../src/usage.ts'
 import { describe, expect, it, vi } from 'vitest'
 import type { AuthorizationFlow } from '@deepseek-ai/dsh-authorization'
 import { RequestLifetime } from '../src/host/request-lifetime.ts'
@@ -39,6 +40,7 @@ function controller(overrides: Record<string, unknown> = {}): CodexSubscriptionC
     listeners: new Set(),
     refreshEpoch: 0,
     pendingRefreshes: new Set(),
+    usage: new UsageReader(async () => ({ windows: [], checkedAt: new Date().toISOString() })),
     disposed: false,
     ...overrides,
   })
@@ -46,6 +48,45 @@ function controller(overrides: Record<string, unknown> = {}): CodexSubscriptionC
 }
 
 describe('CodexSubscriptionController authorization lifecycle', () => {
+  it('keeps quota failure separate from model login and rejects signed-out reads', async () => {
+    const subject = controller({
+      state: { status: 'signed-in', models: [] },
+      usage: new UsageReader(async () => { throw new Error('quota unavailable') }),
+    })
+    await expect(subject.getUsage()).rejects.toThrow('quota unavailable')
+    expect(subject.getState().status).toBe('signed-in')
+    const signedOut = controller({ state: { status: 'signed-out', models: [] } })
+    expect(() => signedOut.getUsage()).toThrow('Sign in before reading subscription limits')
+  })
+
+  it('sign-out cancels a quota lease and waits before deleting the grant', async () => {
+    const entered = deferred<void>()
+    const release = deferred<void>()
+    const deleteRecord = vi.fn(async () => {})
+    let requestSignal: AbortSignal | undefined
+    const subject = controller({
+      state: { status: 'signed-in', models: [] },
+      models: { getAuth: async () => ({ auth: { apiKey: 'synthetic-oauth-access' }, source: 'OAuth' }) },
+      ctx: { credentials: { deleteRecord }, authorization: { cancel: () => {} } },
+    })
+    Object.assign(subject, { usage: new UsageReader(() => subject.withImageAuth(
+      new AbortController().signal, async (_access, signal) => {
+        requestSignal = signal
+        entered.resolve()
+        await release.promise
+        return { windows: [], checkedAt: new Date().toISOString() }
+      })) })
+    const result = subject.getUsage().then(() => 'done', () => 'cancelled')
+    await entered.promise
+    const signOut = subject.signOut()
+    expect(requestSignal?.aborted).toBe(true)
+    expect(deleteRecord).not.toHaveBeenCalled()
+    release.resolve()
+    expect(await result).toBe('cancelled')
+    await signOut
+    expect(deleteRecord).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps an image auth lease active through its callback so sign-out waits before deleting the grant', async () => {
     const entered = deferred<void>()
     const release = deferred<void>()

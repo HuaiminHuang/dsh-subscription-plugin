@@ -99,6 +99,8 @@ pi-ai 的非 Codex 依赖 `@google/genai` 和 `protobufjs` 的安装脚本不参
 
 安装后按 DSH 提示加载插件，在 **设置 → OpenAI** 中登录，再从会话模型选择器中选择订阅模型。GitHub 自动生成的源码压缩包不能直接作为插件安装。
 
-构建与安装说明见[发布指南](docs/RELEASING.md)，验证范围见[发布记录](docs/RELEASE_NOTES_v0.1.1.md)，技术要求见[兼容性基线](docs/COMPATIBILITY_BASELINE.md)。当前未提供订阅额度查询或重置卡功能。
+构建与安装说明见[发布指南](docs/RELEASING.md)，验证范围见[发布记录](docs/RELEASE_NOTES_v0.1.1.md)，技术要求见[兼容性基线](docs/COMPATIBILITY_BASELINE.md)。设置页已加入实验性的只读订阅额度查询：使用本插件保存的 OAuth 在 Host 查询五小时与每周窗口，显示剩余比例、重置倒计时和查询时间；限额位于默认折叠的模型列表上方。进入页面时查询，60 秒内复用缓存，也可手动刷新。缺失数据显示未知，刷新失败保留上次数据，不影响模型登录。
+
+额度来源为 `chatgpt.com/backend-api/wham/usage`，它不是稳定公开的 HTTP API，可能随服务端变化失效。已用授权账户验证真实响应和生产解析模块；不读取其他应用凭据，不向 Client 发送 token、邮箱或账户 ID。未实现重置卡消费，Windows/macOS 的实际 GUI 尚未验收。
 
 本项目是独立社区插件，非 DeepSeek 或 OpenAI 官方产品。

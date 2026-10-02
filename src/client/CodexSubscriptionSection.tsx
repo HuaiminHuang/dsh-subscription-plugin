@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { Button, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { CodexLoginMethod, CodexSubscriptionState } from '../types.ts'
+import type { CodexLoginMethod, CodexSubscriptionState, CodexUsageSnapshot } from '../types.ts'
 import type { en } from './locales.ts'
+import { UsageCard } from './UsageCard.tsx'
 import css from './CodexSubscriptionSection.module.css'
 
 /** Browser-facing Host calls for the Codex settings page. */
 export interface CodexSubscriptionOperations {
+  getUsage(): Promise<CodexUsageSnapshot>
+  refreshUsage(): Promise<CodexUsageSnapshot>
   getState(): Promise<CodexSubscriptionState>
   beginLogin(method: CodexLoginMethod): Promise<CodexSubscriptionState>
   cancelLogin(attemptId: string): Promise<CodexSubscriptionState>
@@ -197,9 +200,11 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
           </div>
         )}
       </div>
-      <div>
+      {state.status === 'signed-in' && <UsageCard key={state.instanceId} t={t}
+        getUsage={operations.getUsage} refreshUsage={operations.refreshUsage} />}
+      <details className={css.modelDisclosure}>
+        <summary className={css.modelsTitle}>{t('models')} ({state.models.length})</summary>
         <div className={css.cardHeader} aria-busy={refreshingModels}>
-          <h3 className={css.modelsTitle}>{t('models')}</h3>
           {state.status === 'signed-in' && (
             <Button variant="outline" size="sm" disabled={refreshingModels} onClick={refreshModels}>{t('refreshModels')}</Button>
           )}
@@ -208,7 +213,7 @@ export function CodexSubscriptionSection({ t, useState: useCodexState, operation
         {state.models.length === 0 ? <p className={css.empty}>{t('noModels')}</p> : (
           <ul className={css.models}>{state.models.map(model => <li key={model.id}><span>{model.name}</span><code>{model.id}</code></li>)}</ul>
         )}
-      </div>
+      </details>
     </section>
   )
 }

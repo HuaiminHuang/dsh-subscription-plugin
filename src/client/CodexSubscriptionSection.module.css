@@ -157,3 +157,79 @@
     gap: 2px;
   }
 }
+
+.usageCard {
+  margin-top: 8px;
+  gap: 24px;
+  padding: 18px 16px;
+}
+
+.usageWindow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.usageMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.usageTrack {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-module-platform);
+}
+
+.usageFill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--dsw-alias-label-primary);
+}
+
+.usageFooter {
+  min-height: 20px;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.usageLoading {
+  min-height: 104px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--dsw-alias-settings-card-stroke);
+  border-top-color: var(--dsw-alias-label-primary);
+  border-radius: 50%;
+  animation: usage-spin 1s linear infinite;
+}
+
+@keyframes usage-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+}
+
+.modelDisclosure summary {
+  cursor: pointer;
+  padding: 8px 0;
+}
+
+.modelDisclosure .cardHeader {
+  justify-content: flex-end;
+}

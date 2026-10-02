@@ -145,7 +145,7 @@ try {
 } finally { await hostCtx.fiber.dispose() }
 const manifest = validateTypertManifest(packageName, TYPERT)
 const names = new Set(manifest.invocations.map(invocation => `${invocation.namespace}/${invocation.method}`))
-for (const name of ['codexSubscription/getState', 'codexSubscription/beginLogin', 'codexSubscription/watch', 'codexSubscription/refreshModels']) {
+for (const name of ['codexSubscription/getUsage', 'codexSubscription/refreshUsage', 'codexSubscription/getState', 'codexSubscription/beginLogin', 'codexSubscription/watch', 'codexSubscription/refreshModels']) {
   if (!names.has(name)) throw new Error(`Built Typert manifest is missing ${name}`)
 }
 if (names.has('codexSubscription/refreshLogin') || TYPERT_REMOTE.descriptors.some(item => item.method === 'refreshLogin')) {
@@ -295,7 +295,7 @@ try {
     }
     await act(async () => { root.render(React.createElement(sections[0].component, {
       t: key => key, useState: selector => selector({ status: 'signed-in', models: [] }),
-      operations: { signOut: async () => { throw new Error('private Host diagnostic') } },
+      operations: { getUsage: async () => ({ windows: [], checkedAt: new Date().toISOString() }), signOut: async () => { throw new Error('private Host diagnostic') } },
     })) })
     let rejectRefresh
     let refreshCalls = 0
@@ -303,6 +303,7 @@ try {
     await act(async () => { root.render(React.createElement(sections[0].component, {
       t: key => key, useState: selector => selector(retainedState),
       operations: {
+        getUsage: async () => ({ windows: [], checkedAt: new Date().toISOString() }),
         refreshModels: () => { refreshCalls++; return new Promise((_resolve, reject) => { rejectRefresh = reject }) },
         signOut: async () => { throw new Error('private Host diagnostic') },
       },
