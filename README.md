@@ -77,10 +77,10 @@ dsh plugin --profile web add /absolute/path/to/plugin.tgz
 GitHub 源码安装（本次源码变更新增，旧 `v0.1.1` 标签不包含此构建支持）：
 
 ```sh
-dsh plugin --profile web add github:HuaiminHuang/dsh-subscription-plugin
+dsh plugin --profile web add github:HuaiminHuang/dsh-subscription-plugin#codex/github-prepare
 ```
 
-Git 安装通过 `prepare` 自动生成 Host、Client、Typert 和类型声明，不需要本地 DSH 源码目录。pnpm 要求允许该包的构建脚本时，将 pnpm 报错打印的**完整许可键**（含 Git 来源和提交）复制到 **目标 profile** 的 `pnpm-workspace.yaml`，再重新安装。仅填写包名在 pnpm 11.7 中不足以允许 Git prepare：
+Git 安装通过 `prepare` 自动生成 Host、Client、Typert 和类型声明，不需要本地 DSH 源码目录。pnpm 要求允许该包的构建脚本时，将 pnpm 报错打印的**完整许可键**（含 Git 来源和提交）复制到 **目标 profile** 的 `pnpm-workspace.yaml`，再重新安装。如果 pnpm 切换到 GitHub 下载源并提示另一个键，保留原条目，再添加新键。仅填写包名在 pnpm 11.7 中不足以允许 Git prepare：
 
 ```yaml
 allowBuilds:

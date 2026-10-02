@@ -1,6 +1,6 @@
 # 发布说明（维护者）
 
-当前版本为 `0.1.1`，面向 DSH `0.2.0-rc.2` 的兼容性发行版，发行范围限定为 Ubuntu / Web。上一个正式 tarball 为 `0.1.0`，支持范围限定为旧基线中的 Ubuntu / Web。版本标签不代表 Desktop 或全部账号能力已验收；每版的验证范围与实验能力必须单独记录。`private: true` 保留，用于阻止意外发布到 npm registry，不影响 `npm pack` 或 GitHub Release 附件。GitHub 源码 ZIP/TAR 不含构建产物，不是可安装 Bundle。
+当前版本为 `0.1.1`，面向 DSH `0.2.0-rc.2` 的兼容性发行版，发行范围限定为 Ubuntu / Web。上一个正式 tarball 为 `0.1.0`，支持范围限定为旧基线中的 Ubuntu / Web。版本标签不代表 Desktop 或全部账号能力已验收；每版的验证范围与实验能力必须单独记录。`private: true` 保留，用于阻止意外发布到 npm registry，不影响 `npm pack` 或 GitHub Release 附件。GitHub 源码 ZIP/TAR 不含构建产物，不是预构建 Bundle；Git 来源由包管理器执行 prepare 后安装。
 
 历史预发布说明见 [v0.0.2](RELEASE_NOTES_v0.0.2.md)，历史正式版说明见 [v0.1.0](RELEASE_NOTES_v0.1.0.md)，当前版说明见 [v0.1.1](RELEASE_NOTES_v0.1.1.md)。
 

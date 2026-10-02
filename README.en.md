@@ -83,10 +83,10 @@ The current version `0.1.1` targets DSH `0.2.0-rc.2` and its patched pi-ai `0.87
 Git source installation is supported by the current source change (the old `v0.1.1` tag does not include it):
 
 ```sh
-dsh plugin --profile web add github:HuaiminHuang/dsh-subscription-plugin
+dsh plugin --profile web add github:HuaiminHuang/dsh-subscription-plugin#codex/github-prepare
 ```
 
-The self-contained `prepare` builds Host, Client, Typert and declarations without a DSH source checkout. If pnpm requires build approval, copy the exact key printed in its error (including the Git source and commit) into the target profile's `pnpm-workspace.yaml` and retry. A package-name-only key is insufficient for Git prepare in pnpm 11.7:
+The self-contained `prepare` builds Host, Client, Typert and declarations without a DSH source checkout. If pnpm requires build approval, copy the exact key printed in its error (including the Git source and commit) into the target profile's `pnpm-workspace.yaml` and retry. If pnpm switches to a GitHub download source and reports another key, retain the existing entry and add that key too. A package-name-only key is insufficient for Git prepare in pnpm 11.7:
 
 ```yaml
 allowBuilds:
