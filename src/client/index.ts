@@ -54,6 +54,8 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const ui = ctx.inject(['slots', 'locale', 'remote.codexSubscription'], (child) => {
     const t = child.locale.bind('settings.codexSubscription')
     const operations: CodexSubscriptionOperations = {
+      getUsage: async () => result(await child.remote.codexSubscription.getUsage()),
+      refreshUsage: async () => result(await child.remote.codexSubscription.refreshUsage()),
       getState: () => call(() => child.remote.codexSubscription.getState()),
       beginLogin: method => call(() => child.remote.codexSubscription.beginLogin(method)),
       cancelLogin: attemptId => call(() => child.remote.codexSubscription.cancelLogin(attemptId)),

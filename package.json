@@ -1,6 +1,6 @@
 {
   "name": "@h2mzzz/dsh-openai-subscription",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Opt-in ChatGPT Codex subscription provider for DeepSeek Harness",
   "private": true,
   "type": "module",

@@ -28,3 +28,15 @@ export interface CodexSpeedState {
   /** Model can request Fast; this does not assert account entitlement. */
   readonly supported: boolean
 }
+
+/** Safe server-reported account quota window, independent of per-request token usage. */
+export interface CodexUsageWindow {
+  readonly windowDurationMins: number
+  readonly usedPercent: number
+  readonly resetsAt: number | null
+}
+
+export interface CodexUsageSnapshot {
+  readonly windows: readonly CodexUsageWindow[]
+  readonly checkedAt: string
+}

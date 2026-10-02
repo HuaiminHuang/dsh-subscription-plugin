@@ -6,7 +6,7 @@
  */
 import { z } from 'zod'
 import type { RemoteResult, RemoteStreamHandle, TypertRemoteContribution } from '@deepseek-ai/dsh-typert-protocol'
-import type { CodexLoginMethod, CodexSubscriptionState, CodexSpeedState } from './types.ts'
+import type { CodexLoginMethod, CodexSubscriptionState, CodexSpeedState, CodexUsageSnapshot } from './types.ts'
 
 const loginMethod = () => z.enum(['browser', 'device_code'])
 
@@ -23,6 +23,11 @@ const state = z.object({
   checkedAt: z.string().readonly().optional(),
 })
 
+const usageCodec = () => z.object({
+  windows: z.array(z.object({ windowDurationMins: z.number().positive(), usedPercent: z.number().min(0).max(100), resetsAt: z.number().int().nonnegative().nullable() })).readonly(),
+  checkedAt: z.string(),
+})
+
 const speedCodec = () => z.object({ enabled: z.boolean(), supported: z.boolean() })
 const boolean = () => z.boolean()
 const sessionIdCodec = () => z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/)
@@ -34,6 +39,8 @@ const stateCodec = () => state
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface TypertRemoteNamespaceMap {
     codexSubscription: {
+      getUsage(): Promise<RemoteResult<CodexUsageSnapshot>>
+      refreshUsage(): Promise<RemoteResult<CodexUsageSnapshot>>
       getState(): Promise<RemoteResult<CodexSubscriptionState>>
       beginLogin(method: CodexLoginMethod): Promise<RemoteResult<CodexSubscriptionState>>
       cancelLogin(attemptId: string): Promise<RemoteResult<CodexSubscriptionState>>
@@ -50,6 +57,11 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 export const TYPERT_REMOTE: TypertRemoteContribution = {
   package: '@h2mzzz/dsh-openai-subscription',
   descriptors: [
+    ...['getUsage', 'refreshUsage'].map(method => ({
+      id: `@h2mzzz/dsh-openai-subscription#codexSubscription/${method}`, service: 'codexSubscription', namespace: 'codexSubscription', method,
+      invocation: { kind: 'direct' as const }, parameters: [], result: { mode: 'strict' as const, typeSymbol: '@h2mzzz/dsh-openai-subscription#usage', create: usageCodec },
+      sourceLocation: { file: 'src/controller.ts', line: method === 'getUsage' ? 135 : 142, column: 3 },
+    })),
     { id: '@h2mzzz/dsh-openai-subscription#codexSubscription/getSpeed', service: 'codexSubscription', namespace: 'codexSubscription', method: 'getSpeed', invocation: { kind: 'direct' }, parameters: [{ name: 'sessionId', wire: 'sessionId', source: 'json', codec: { mode: 'strict', typeSymbol: 'string', create: sessionIdCodec } }, { name: 'model', wire: 'model', source: 'json', codec: { mode: 'strict', typeSymbol: 'string', create: modelCodec } }], result: { mode: 'strict', typeSymbol: '@h2mzzz/dsh-openai-subscription#speed', create: speedCodec }, sourceLocation: { file: 'src/controller.ts', line: 207, column: 3 } },
     { id: '@h2mzzz/dsh-openai-subscription#codexSubscription/setSpeed', service: 'codexSubscription', namespace: 'codexSubscription', method: 'setSpeed', invocation: { kind: 'direct' }, parameters: [{ name: 'sessionId', wire: 'sessionId', source: 'json', codec: { mode: 'strict', typeSymbol: 'string', create: sessionIdCodec } }, { name: 'model', wire: 'model', source: 'json', codec: { mode: 'strict', typeSymbol: 'string', create: modelCodec } }, { name: 'enabled', wire: 'enabled', source: 'json', codec: { mode: 'strict', typeSymbol: 'boolean', create: boolean } }], result: { mode: 'strict', typeSymbol: '@h2mzzz/dsh-openai-subscription#speed', create: speedCodec }, sourceLocation: { file: 'src/controller.ts', line: 207, column: 3 } },
     { id: '@h2mzzz/dsh-openai-subscription#codexSubscription/getState', service: 'codexSubscription', namespace: 'codexSubscription', method: 'getState', invocation: { kind: 'direct' }, parameters: [], result: { mode: 'strict', typeSymbol: '@h2mzzz/dsh-openai-subscription#state', create: stateCodec }, sourceLocation: { file: 'src/controller.ts', line: 91, column: 3 } },

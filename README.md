@@ -68,7 +68,7 @@ Agent 使用可选的 `reference_images` 参数，每项指定当前会话图片
 
 关闭生图工具不影响订阅对话；关闭紧凑模型滑块会恢复原有「模型 / 推理等级」菜单，并保留已选择的思考强度与速度。停用订阅接入后，依赖登录的功能随之停止。
 
-当前版本 `0.1.1` 面向 DSH `0.2.0-rc.2`，使用其补丁版 pi-ai `0.87.1`；发行范围限定为 Ubuntu / Web；Desktop 与真实账号端到端流程未验收。旧版插件锁定 DSH `0.1.7-rc.2`，不能直接安装到新版本。
+当前版本 `0.1.2` 面向 DSH `0.2.0-rc.2`，使用其补丁版 pi-ai `0.87.1`；发行范围限定为 Ubuntu / Web；Desktop 与真实账号端到端流程未验收。旧版插件锁定 DSH `0.1.7-rc.2`，不能直接安装到新版本。
 
 ## 安装与开始使用
 
@@ -78,10 +78,10 @@ Agent 使用可选的 `reference_images` 参数，每项指定当前会话图片
 dsh plugin --profile web add /absolute/path/to/plugin.tgz
 ```
 
-GitHub 源码安装（本次源码变更新增，旧 `v0.1.1` 标签不包含此构建支持）：
+GitHub 源码安装（`v0.1.2` 包含独立 `prepare` 构建支持）：
 
 ```sh
-dsh plugin --profile web add github:HuaiminHuang/dsh-subscription-plugin#codex/github-prepare
+dsh plugin --profile web add github:HuaiminHuang/dsh-subscription-plugin#v0.1.2
 ```
 
 Git 安装通过 `prepare` 自动生成 Host、Client、Typert 和类型声明，不需要本地 DSH 源码目录。pnpm 要求允许该包的构建脚本时，将 pnpm 报错打印的**完整许可键**（含 Git 来源和提交）复制到 **目标 profile** 的 `pnpm-workspace.yaml`，再重新安装。如果 pnpm 切换到 GitHub 下载源并提示另一个键，保留原条目，再添加新键。仅填写包名在 pnpm 11.7 中不足以允许 Git prepare：
@@ -99,6 +99,8 @@ pi-ai 的非 Codex 依赖 `@google/genai` 和 `protobufjs` 的安装脚本不参
 
 安装后按 DSH 提示加载插件，在 **设置 → OpenAI** 中登录，再从会话模型选择器中选择订阅模型。GitHub 自动生成的源码压缩包不能直接作为插件安装。
 
-构建与安装说明见[发布指南](docs/RELEASING.md)，验证范围见[发布记录](docs/RELEASE_NOTES_v0.1.1.md)，技术要求见[兼容性基线](docs/COMPATIBILITY_BASELINE.md)。当前未提供订阅额度查询或重置卡功能。
+构建与安装说明见[发布指南](docs/RELEASING.md)，验证范围见[发布记录](docs/RELEASE_NOTES_v0.1.2.md)，技术要求见[兼容性基线](docs/COMPATIBILITY_BASELINE.md)。设置页已加入实验性的只读订阅额度查询：使用本插件保存的 OAuth 在 Host 查询五小时与每周窗口，显示剩余比例、重置倒计时和查询时间；限额位于默认折叠的模型列表上方。进入页面时查询，60 秒内复用缓存，也可手动刷新。缺失数据显示未知，刷新失败保留上次数据，不影响模型登录。
+
+额度来源为 `chatgpt.com/backend-api/wham/usage`，它不是稳定公开的 HTTP API，可能随服务端变化失效。已用授权账户验证真实响应和生产解析模块；不读取其他应用凭据，不向 Client 发送 token、邮箱或账户 ID。未实现重置卡消费，Windows/macOS 的实际 GUI 尚未验收。
 
 本项目是独立社区插件，非 DeepSeek 或 OpenAI 官方产品。
