@@ -2,7 +2,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { CodexSubscriptionController } from '../controller.ts'
-import { imageResponse } from './artifact.ts'
+import { imageResponse, type ImageSource } from './artifact.ts'
 import { createImageTool } from './tool.ts'
 import { imageSkill } from './skill.ts'
 import { disposeAll } from '../lifecycle.ts'
@@ -14,9 +14,17 @@ export function mountImageFeature(ctx: Context, controller: CodexSubscriptionCon
   let removeTool: (() => void) | undefined
   let removeSkill: (() => void) | undefined
   let closed = false
+  const source: ImageSource = {
+    events: async (sessionId, signal) => {
+      using observation = await ctx.sessionQuery.observeSession(SessionId(sessionId), { signal, projectionMode: 'none' })
+      return [...observation.events]
+    },
+    readImage: (ref, signal) => ctx.attachments.readImage(ref, signal),
+  }
   const imageTool = createImageTool({
     fetcher: fetch,
     saveImages: images => ctx.attachments.saveImages(images),
+    references: source,
     withImageAuth: async (signal, run) => {
       const work = controller.withImageAuth(AbortSignal.any([signal, owner.signal]), run)
       tasks.add(work)
@@ -26,13 +34,7 @@ export function mountImageFeature(ctx: Context, controller: CodexSubscriptionCon
   const route = ctx.connection.fetch.register({
     path: '/api/codex-subscription/image', methods: ['GET', 'HEAD'], requestBody: 'buffered',
     fetch: request => imageResponse(request, {
-      events: async (sessionId, signal) => {
-        using observation = await ctx.sessionQuery.observeSession(SessionId(sessionId), {
-          signal, projectionMode: 'none',
-        })
-        return [...observation.events]
-      },
-      readImage: (ref, signal) => ctx.attachments.readImage(ref, signal),
+      ...source,
       diagnose: category => warnHost(ctx, `image-preview-${category}`),
     }),
   })
