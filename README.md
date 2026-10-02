@@ -68,11 +68,30 @@ kind: "package-bundle"
 
 ## 安装与开始使用
 
-使用构建后的 npm `.tgz` 包安装到 Web profile，将示例路径替换为实际绝对路径：
+正式发行的 `.tgz` 可直接安装到 Web profile，将示例路径替换为实际绝对路径：
 
 ```sh
 dsh plugin --profile web add /absolute/path/to/plugin.tgz
 ```
+
+GitHub 源码安装（本次源码变更新增，旧 `v0.1.1` 标签不包含此构建支持）：
+
+```sh
+dsh plugin --profile web add github:HuaiminHuang/dsh-subscription-plugin
+```
+
+Git 安装通过 `prepare` 自动生成 Host、Client、Typert 和类型声明，不需要本地 DSH 源码目录。pnpm 要求允许该包的构建脚本时，将 pnpm 报错打印的**完整许可键**（含 Git 来源和提交）复制到 **目标 profile** 的 `pnpm-workspace.yaml`，再重新安装。仅填写包名在 pnpm 11.7 中不足以允许 Git prepare：
+
+```yaml
+allowBuilds:
+  "<pnpm 报错打印的完整许可键>": true
+  "@google/genai": false
+  protobufjs: false
+```
+
+pi-ai 的非 Codex 依赖 `@google/genai` 和 `protobufjs` 的安装脚本不参与本插件功能，沿用本仓库策略明确拒绝；无需允许它们执行。
+
+这项配置允许安装时执行本插件的构建代码。建议安装时固定经过验证的提交（在 GitHub spec 后追加 `#<commit>`）。本仓库仍保留 `private: true`，尚未提供 npm registry 包名安装。
 
 安装后按 DSH 提示加载插件，在 **设置 → OpenAI** 中登录，再从会话模型选择器中选择订阅模型。GitHub 自动生成的源码压缩包不能直接作为插件安装。
 

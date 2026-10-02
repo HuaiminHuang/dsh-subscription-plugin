@@ -1,10 +1,8 @@
 import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import { describe, expect, it, vi } from 'vitest'
-import { applyEntryPatches } from '../../deepseek-harness/vendor/include/lib/index.js'
+import { applyEntryPatches } from '@deepseek-ai/cordis-plugin-include'
 
-const targetRequire = createRequire(new URL('../../deepseek-harness/vendor/include/package.json', import.meta.url))
-const { load } = targetRequire('js-yaml')
+import { load } from 'js-yaml'
 const bundle = load(readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8'))
 
 describe('image tool Plugins switch', () => {

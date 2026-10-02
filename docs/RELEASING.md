@@ -18,4 +18,12 @@
 
 提交版本变更，仅为该提交建立附注 tag `v<版本>`。本地保存与远端发布是两步：没有推送时不得声称 GitHub Release 已上线。用户要求远端发布后，再推送提交和 tag，为正式版创建普通 Release，上传 tarball、校验文件和发布说明；候选版使用 Pre-release。发布说明必须包含精确 DSH/pi-ai 版本、已验证平台与仍未验证的能力。
 
-用户安装构建后的 `.tgz`，不用 Git 地址或自动生成的源码压缩包。不在发布脚本、日志和附件中包含访问令牌；使用维护者已有的 GitHub 授权，不要求在聊天中提供 token。
+历史发行标签仅支持构建后的 `.tgz`；当前源码支持 Git 地址的 prepare 构建。自动生成的源码压缩包不能作为已构建 Bundle 安装。不在发布脚本、日志和附件中包含访问令牌；使用维护者已有的 GitHub 授权，不要求在聊天中提供 token。
+
+## Git 源码安装构建
+
+当前源码新增自包含 `prepare`，与正式构建共享 CSS、ModuleLoader 包装和标准装饰器转换；均先清理 `lib/`，再生成 JS 与类型声明。全部开发依赖使用公开 npm 固定 DSH 版本，pi-ai 补丁随仓库保存。`private: true` 继续保留，本次不发布 npm。
+
+Git 安装需要消费者按 pnpm 提示允许该包构建，不得用仓库自身的构建白名单冒充消费者许可。验收须使用无 `lib/`、无 `node_modules/`、无相邻 DSH 源码的克隆，证明 Git 依赖自动触发 prepare，并另验隔离 profile 的 Loader 挂载及卸载。旧发布标签不回写；发布后 README 才可推荐包含新构建支持的标签。
+
+`scripts/verify-profile.mjs` 使用公开 DSH 包检验已安装的隔离 Web profile；调用 `pnpm test:profile /absolute/path/to/isolated-dsh-home`。认证、网络与存储仍为合成测试依赖，不能据此宣布真实账号或 Desktop 通过。

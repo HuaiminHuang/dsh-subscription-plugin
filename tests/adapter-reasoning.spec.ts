@@ -3,7 +3,7 @@ import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import type { AssistantMessageEvent } from '@earendil-works/pi-ai'
 import type { Context } from '@deepseek-ai/cordis'
-import { buildModelCatalog } from '../../deepseek-harness/packages/api/session-controller/src/catalog.ts'
+import { buildModelCatalog } from '@deepseek-ai/dsh-api-session-controller'
 import { CodexSubscriptionAdapter } from '../src/adapter.ts'
 import type { CodexSubscriptionController } from '../src/controller.ts'
 
