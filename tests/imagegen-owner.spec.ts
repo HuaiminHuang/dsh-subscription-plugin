@@ -1,7 +1,53 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mountImageFeature } from '../src/imagegen/index.ts'
+import type { createImageTool } from '../src/imagegen/tool.ts'
 
 describe('opt-in image feature owner', () => {
+  it('aborts reference reads, disposes session observations and drains the request on unload', async () => {
+    const attachment = { attachmentId: `sha256:${'a'.repeat(64)}`, mediaType: 'image/png', bytes: 8, width: 1, height: 1 }
+    const observationDisposed = vi.fn()
+    let started!: () => void
+    const reading = new Promise<void>(resolve => { started = resolve })
+    let release!: () => void
+    const held = new Promise<void>(resolve => { release = resolve })
+    let readSignal!: AbortSignal
+    let tool!: ReturnType<typeof createImageTool>
+    const saveImages = vi.fn()
+    const route = vi.fn(async () => {})
+    const dispose = mountImageFeature({
+      tools: { register: (value: typeof tool) => { tool = value; return vi.fn() } },
+      skills: { register: () => vi.fn() },
+      connection: { fetch: { register: () => route } },
+      sessionQuery: { observeSession: async () => ({
+        events: [{ type: 'user/message', data: { content: [{ type: 'image', attachment }] } }],
+        [Symbol.dispose]: observationDisposed,
+      }) },
+      attachments: { saveImages, readImage: async (_ref: unknown, signal: AbortSignal) => {
+        readSignal = signal
+        started()
+        await held
+        return { ref: attachment, data: Buffer.from('89504e470d0a1a0a', 'hex') }
+      } },
+    } as never, {
+      subscribeState: (listener: (state: { status: string }) => void) => { listener({ status: 'signed-in' }); return vi.fn() },
+      withImageAuth: async (signal: AbortSignal, run: (access: string, signal: AbortSignal) => Promise<unknown>) => run('unused-before-fetch', signal),
+    } as never)
+    const task = tool.execute({ prompt: 'use the reference', reference_images: [{ attachment_id: attachment.attachmentId }] }, {
+      agent: { session: { id: 'example' } }, signal: new AbortController().signal,
+    } as never)
+    const failure = expect(task).rejects.toThrow('unavailable')
+    try {
+      await reading
+      expect(observationDisposed).toHaveBeenCalledOnce()
+      const unloading = dispose()
+      expect(readSignal.aborted).toBe(true)
+      release()
+      await failure
+      await unloading
+      expect(saveImages).not.toHaveBeenCalled()
+      expect(route).toHaveBeenCalledOnce()
+    } finally { release(); await failure; await dispose() }
+  })
   it('contains an image-tool registration failure during a later sign-in without throwing into the text controller', async () => {
     let stateChanged!: (state: { status: 'signed-in' | 'signed-out' }) => void
     const route = vi.fn(async () => {})

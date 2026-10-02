@@ -1,8 +1,9 @@
 /** Fixed Codex image endpoint. Secrets and provider responses never leave Host. */
 import type { ImageAttachmentRef, SaveImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { accountIdFromAccess } from '../codex-auth.ts'
+import { MAX_REFERENCE_IMAGES, MAX_REFERENCE_BYTES, MAX_TOTAL_REFERENCE_BYTES, ReferenceImageError } from './references.ts'
 
-const URL = 'https://chatgpt.com/backend-api/codex/images/generations'
+const BASE_URL = 'https://chatgpt.com/backend-api/codex/images/'
 const MAX_IMAGE = 20_000_000
 const MAX_RESPONSE = 27_000_000
 
@@ -54,16 +55,26 @@ async function bounded(response: Response, signal: AbortSignal): Promise<string>
 /** A single explicit image, using a fresh plugin-owned OAuth access supplied by the controller. */
 export async function generateImage(
   backend: ImageBackend, access: string, prompt: string, signal: AbortSignal,
+  references: readonly SaveImageAttachment[] = [],
 ): Promise<ImageAttachmentRef> {
   signal.throwIfAborted()
+  if (references.length > MAX_REFERENCE_IMAGES) throw new ReferenceImageError('At most 10 reference images are allowed; remove extra images and retry')
+  let total = 0
+  for (const image of references) {
+    total += image.data.byteLength
+    if (image.data.byteLength === 0 || image.data.byteLength > MAX_REFERENCE_BYTES || total > MAX_TOTAL_REFERENCE_BYTES) throw new ReferenceImageError('Reference images exceed the 20 MB per-image or 50 MB total limit')
+    if (mediaType(Buffer.from(image.data)) !== image.mediaType) throw new ReferenceImageError('Reference image format does not match its attachment')
+  }
   const account = accountId(access)
   if (!prompt.trim() || prompt.length > 4000) throw new ImageGenerationError('invalid-response')
   let response: Response
   try {
-    response = await backend.fetcher(URL, {
+    response = await backend.fetcher(BASE_URL + (references.length ? 'edits' : 'generations'), {
       method: 'POST', redirect: 'error', signal,
       headers: { Authorization: `Bearer ${access}`, 'ChatGPT-Account-ID': account, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'gpt-image-2', prompt, background: 'auto', quality: 'auto', size: 'auto' }),
+      body: JSON.stringify({ model: 'gpt-image-2', prompt, background: 'auto', quality: 'auto', size: 'auto',
+        ...(references.length ? { images: references.map(image => ({ image_url: `data:${image.mediaType};base64,${Buffer.from(image.data).toString('base64')}` })) } : {}),
+      }),
     })
   } catch {
     signal.throwIfAborted()

@@ -50,7 +50,11 @@ Vision and image generation are independent: disabling the image tool does not d
 
 The separate **OpenAI Image Generation** component provides the `codex_generate_image` tool and a packaged Skill. They register automatically when the component is enabled and the account is signed in, without manual tool configuration.
 
-Generated images appear in conversation cards with preview and download links. Direct tool calls are supported; nested calls through PTC `run_code` are not currently supported. Image generation remains experimental, with real-account end-to-end acceptance still pending.
+Generated images appear in conversation cards with preview and download links. Direct tool calls are supported; nested calls through PTC `run_code` are not currently supported. Image generation remains experimental: the current source completed one real-account ten-reference request through the formal tool in isolated Web, including attachment storage. Browser preview/download, restart replay and Windows/macOS acceptance remain pending. See the [reference-generation validation record](docs/REFERENCE_IMAGE_VALIDATION.md).
+
+The tool supports text-only and **reference-based generation**. Upload images into the current conversation and explain each image's role, such as “preserve the subject in Image 1 and use Image 2's style.” Use at most 10 references, up to 20 MB each and 50 MB combined. Excess inputs are rejected, never silently truncated. Earlier successful generated images in the same session can also be reused. Missing or unreadable references do not fall back to text-only generation.
+
+The optional `reference_images` array selects each image through its session image handle's `attachment_id` or an earlier generated result's `tool_call_id`. Host verifies session ownership and reads the attachments; paths, external URLs and Base64 are not accepted. Reference generation uses the subscription `images/edits` endpoint. Masks and pixel-exact editing are unsupported, and preservation of every detail is not guaranteed.
 
 ## Independent component switches
 

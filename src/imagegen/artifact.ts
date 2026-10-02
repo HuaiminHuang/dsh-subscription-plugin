@@ -2,7 +2,7 @@
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { IMAGE_SUCCESS_TEXT } from './contract.ts'
 
-interface Event { readonly type: string; readonly data: unknown }
+export interface Event { readonly type: string; readonly data: unknown }
 
 export interface ImageSource {
   diagnose?(category: 'request' | 'session' | 'result' | 'attachment'): void
@@ -10,11 +10,11 @@ export interface ImageSource {
   readImage(ref: ImageAttachmentRef, signal: AbortSignal): Promise<{ readonly ref: ImageAttachmentRef; readonly data: Uint8Array }>
 }
 
-const object = (value: unknown): Record<string, unknown> | undefined =>
+export const object = (value: unknown): Record<string, unknown> | undefined =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown> : undefined
 
-const reference = (value: unknown): ImageAttachmentRef | undefined => {
+export const reference = (value: unknown): ImageAttachmentRef | undefined => {
   const ref = object(value)
   if (ref === undefined || typeof ref.attachmentId !== 'string'
     || !/^sha256:[a-f0-9]{64}$/.test(ref.attachmentId)
