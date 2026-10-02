@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { MenuSurface, Tooltip, IconRefreshOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { CodexSpeedState, CodexSubscriptionState } from '../types.ts'
 import { modelEn } from './model-locales.ts'
+import { useModelPanelPosition } from './use-model-panel-position.ts'
 import { sliderStops } from './model-options.ts'
 import css from './ModelControl.module.css'
 
@@ -31,10 +32,10 @@ export function ModelControl({ locked, available, directory, load, select, getSp
   const [failed, setFailed] = useState(false)
   const [speed, setSpeedState] = useState<CodexSpeedState>({ enabled: false, supported: false })
   const [speedReady, setSpeedReady] = useState(false)
-  const [position, setPosition] = useState({ left: 0, top: 0 })
   const trigger = useRef<HTMLButtonElement>(null)
   const panel = useRef<HTMLDivElement>(null)
   const modelTrigger = useRef<HTMLButtonElement>(null)
+  const position = useModelPanelPosition({ open, compact, effortList, modelList, trigger, panel })
   const active = useRef(true)
   const operation = useRef(false)
   const generation = useRef(0)
@@ -79,26 +80,6 @@ export function ModelControl({ locked, available, directory, load, select, getSp
     return () => { disposed = true }
   }, [codex, current?.model, getSpeed, controlState.status, controlState.instanceId])
 
-  useLayoutEffect(() => {
-    if (!open) return
-    const place = (): void => {
-      const anchor = trigger.current?.getBoundingClientRect()
-      const card = panel.current?.getBoundingClientRect()
-      if (!anchor || !card) return
-      const margin = 8
-      setPosition({
-        left: Math.max(margin, Math.min(anchor.right - card.width, window.innerWidth - card.width - margin)),
-        top: Math.max(margin, anchor.top - card.height - margin >= margin
-          ? anchor.top - card.height - margin : Math.min(anchor.bottom + margin, window.innerHeight - card.height - margin)),
-      })
-    }
-    place()
-    window.addEventListener('resize', place)
-    window.addEventListener('scroll', place, true)
-    const observer = new ResizeObserver(place)
-    if (panel.current) observer.observe(panel.current)
-    return () => { observer.disconnect(); window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true) }
-  }, [open, compact, effortList, modelList])
 
   const close = (): void => { setModelList(false); setEffortList(false); setOpen(false); trigger.current?.focus() }
   useEffect(() => {

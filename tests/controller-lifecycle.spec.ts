@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AuthorizationFlow } from '@deepseek-ai/dsh-authorization'
+import { RequestLifetime } from '../src/host/request-lifetime.ts'
 import { CodexSubscriptionController } from '../src/controller.ts'
 
 interface Deferred<T> {
@@ -29,7 +30,7 @@ function controller(overrides: Record<string, unknown> = {}): CodexSubscriptionC
     models: { getAvailable: async () => [] },
     adapter: {},
     fastSelections: new Set(),
-    activeRequests: new Set(),
+    requests: new RequestLifetime(),
     registration: undefined,
     attempt: undefined,
     instanceId: 'test-host',
