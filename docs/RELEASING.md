@@ -33,3 +33,11 @@ Git 安装需要消费者按 pnpm 提示允许该包构建，不得用仓库自�
 维护者使用有 `@h2mzzz` scope 权限的 npm 账号登录。完成上述验证后，执行 `npm publish /absolute/path/to/verified.tgz --access public --registry=https://registry.npmjs.org/`，发布同一份经过隔离 Loader 验证的产物。先以 `--dry-run` 检查，正式发布后用 `npm view @h2mzzz/dsh-openai-subscription version` 和无构建许可的干净 profile 检查 registry 安装。不得输出或提交 npm token。
 
 用户输入 `@h2mzzz/dsh-openai-subscription` 获取 latest；需要固定版本时追加 `@0.1.3`。此路径不执行本插件的 Git prepare，GitHub 安装仍受消费者的 allowBuilds 策略约束。
+
+## GitHub Actions 发行同步
+
+`.github/workflows/release.yml` 在 GitHub Release 发布时执行，也支持手动输入已有稳定标签补跑。工作流检验 tag 与 package.json 版本一致，运行类型检查、测试和构建包检查；版本不存在才发布 npm，已有版本直接从 npm 下载。Release 附件因此来自 registry 的实际产物，附带 SHA256SUMS。候选版暂不通过此稳定版工作流发布；隔离 Loader、真实账号和平台验收仍须按发布前清单独立完成。
+
+自动发布前，在 npm 包 Settings → Trusted publishing 配置 GitHub Actions：Owner `HuaiminHuang`，Repository `dsh-subscription-plugin`，Workflow `release.yml`，允许 npm publish，不设置 Environment。工作流使用 OIDC，无需 NPM_TOKEN；没有此绑定时新版本自动发布会失败，但已发布版本的同步不需要 npm 写权限。
+
+GitHub Packages（npm.pkg.github.com）与 npmjs 是独立 registry，不会自动跟踪 npmjs 发布。当前用户安装以 npmjs 为唯一来源，GitHub 用 README npm 徽章、Release 和 Actions 运行记录展示版本与发布进度，不额外双发到 GitHub Packages。
