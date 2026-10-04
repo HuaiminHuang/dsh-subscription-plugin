@@ -2,7 +2,7 @@
 
 当前版本为 `0.1.3`，面向 DSH `0.2.0-rc.2` 的兼容性发行版，发行范围限定为 Ubuntu / Web。上一个正式 tarball 为 `0.1.2`；本版新增 npm 公开发行配置，运行时功能保持不变，仍限定 Ubuntu / Web 验证范围。版本标签不代表 Desktop 或全部账号能力已验收；每版的验证范围与实验能力必须单独记录。0.1.3 移除 private 限制，使用 publishConfig 指定公开 npm registry 发行；运行时功能与 0.1.2 相同。GitHub 源码 ZIP/TAR 不含构建产物，不是预构建 Bundle；Git 来源由包管理器执行 prepare 后安装。
 
-历史预发布说明见 [v0.0.2](RELEASE_NOTES_v0.0.2.md)，历史正式版说明见 [v0.1.0](RELEASE_NOTES_v0.1.0.md)，历史兼容性发行说明见 [v0.1.1](RELEASE_NOTES_v0.1.1.md)，前一版功能与验证记录见 [v0.1.2](RELEASE_NOTES_v0.1.2.md)。
+历史预发布说明见 [v0.0.2](RELEASE_NOTES_v0.0.2.md)，历史正式版说明见 [v0.1.0](RELEASE_NOTES_v0.1.0.md)，历史兼容性发行说明见 [v0.1.1](RELEASE_NOTES_v0.1.1.md)，前一版功能与验证记录见 [v0.1.2](RELEASE_NOTES_v0.1.2.md)，当前发行记录见 [v0.1.3](RELEASE_NOTES_v0.1.3.md)。
 
 ## 发布前
 
@@ -26,6 +26,17 @@
 
 Git 安装需要消费者按 pnpm 提示允许该包构建，不得用仓库自身的构建白名单冒充消费者许可。验收须使用无 `lib/`、无 `node_modules/`、无相邻 DSH 源码的克隆，证明 Git 依赖自动触发 prepare，并另验隔离 profile 的 Loader 挂载及卸载。旧发布标签不回写；发布后 README 才可推荐包含新构建支持的标签。
 
+遇到 `ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED` 时，将报错打印的完整许可键（包括来源 URL 和提交）复制到目标 profile 的 pnpm-workspace.yaml。pnpm 11.7 仅允许包名不足以批准 Git prepare；如果下载来源改变并提示另一个键，保留原键并添加新键。例如：
+
+```yaml
+allowBuilds:
+  "<pnpm 报错打印的完整许可键>": true
+  "@google/genai": false
+  protobufjs: false
+```
+
+pi-ai 的非 Codex 依赖 @google/genai 和 protobufjs 的安装脚本不参与本插件功能，无需放行。优先固定经过验证的标签或提交。此许可要求只针对 Git 源码安装，不应让 npm 包用户添加同样条目。
+
 `scripts/verify-profile.mjs` 使用公开 DSH 包检验已安装的隔离 Web profile；调用 `pnpm test:profile /absolute/path/to/isolated-dsh-home`。认证、网络与存储仍为合成测试依赖，不能据此宣布真实账号或 Desktop 通过。
 
 ## npm 公开发行
@@ -33,3 +44,11 @@ Git 安装需要消费者按 pnpm 提示允许该包构建，不得用仓库自�
 维护者使用有 `@h2mzzz` scope 权限的 npm 账号登录。完成上述验证后，执行 `npm publish /absolute/path/to/verified.tgz --access public --registry=https://registry.npmjs.org/`，发布同一份经过隔离 Loader 验证的产物。先以 `--dry-run` 检查，正式发布后用 `npm view @h2mzzz/dsh-openai-subscription version` 和无构建许可的干净 profile 检查 registry 安装。不得输出或提交 npm token。
 
 用户输入 `@h2mzzz/dsh-openai-subscription` 获取 latest；需要固定版本时追加 `@0.1.3`。此路径不执行本插件的 Git prepare，GitHub 安装仍受消费者的 allowBuilds 策略约束。
+
+## GitHub Actions 发行同步
+
+`.github/workflows/release.yml` 在 GitHub Release 发布时执行，也支持手动输入已有稳定标签补跑。工作流检验 tag 与 package.json 版本一致，运行类型检查、测试和构建包检查；版本不存在才发布 npm，已有版本直接从 npm 下载。Release 附件因此来自 registry 的实际产物，附带 SHA256SUMS。候选版暂不通过此稳定版工作流发布；隔离 Loader、真实账号和平台验收仍须按发布前清单独立完成。
+
+自动发布前，在 npm 包 Settings → Trusted publishing 配置 GitHub Actions：Owner `HuaiminHuang`，Repository `dsh-subscription-plugin`，Workflow `release.yml`，允许 npm publish，不设置 Environment。工作流使用 OIDC，无需 NPM_TOKEN；没有此绑定时新版本自动发布会失败，但已发布版本的同步不需要 npm 写权限。
+
+GitHub Packages（npm.pkg.github.com）与 npmjs 是独立 registry，不会自动跟踪 npmjs 发布。当前用户安装以 npmjs 为唯一来源，GitHub 用 README npm 徽章、Release 和 Actions 运行记录展示版本与发布进度，不额外双发到 GitHub Packages。
