@@ -5,6 +5,8 @@ kind: "package-bundle"
 
 # OpenAI Subscription for DSH
 
+[![npm version](https://img.shields.io/npm/v/@h2mzzz/dsh-openai-subscription)](https://www.npmjs.com/package/@h2mzzz/dsh-openai-subscription)
+
 简体中文 | [English](README.en.md)
 
 通过 ChatGPT/Codex 订阅在 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）中使用 OpenAI 模型。插件提供独立的账户登录、模型选择和图片功能，不替换 DSH 原有的 OpenAI 配置。
@@ -68,11 +70,17 @@ Agent 使用可选的 `reference_images` 参数，每项指定当前会话图片
 
 关闭生图工具不影响订阅对话；关闭紧凑模型滑块会恢复原有「模型 / 推理等级」菜单，并保留已选择的思考强度与速度。停用订阅接入后，依赖登录的功能随之停止。
 
-当前版本 `0.1.2` 面向 DSH `0.2.0-rc.2`，使用其补丁版 pi-ai `0.87.1`；发行范围限定为 Ubuntu / Web；Desktop 与真实账号端到端流程未验收。旧版插件锁定 DSH `0.1.7-rc.2`，不能直接安装到新版本。
+当前版本 `0.1.3` 面向 DSH `0.2.0-rc.2`，使用其补丁版 pi-ai `0.87.1`；发行范围限定为 Ubuntu / Web；Desktop 与真实账号端到端流程未验收。旧版插件锁定 DSH `0.1.7-rc.2`，不能直接安装到新版本。
 
 ## 安装与开始使用
 
-正式发行的 `.tgz` 可直接安装到 Web profile，将示例路径替换为实际绝对路径：
+推荐在 DSH「添加插件」中输入 `@h2mzzz/dsh-openai-subscription`，或通过 CLI 安装指定版本：
+
+```sh
+dsh plugin --profile web add @h2mzzz/dsh-openai-subscription@0.1.3
+```
+
+npm 包包含预构建产物，不需要执行 Git prepare 或添加本插件的构建许可。正式发行的 `.tgz` 也可直接安装到 Web profile，将示例路径替换为实际绝对路径：
 
 ```sh
 dsh plugin --profile web add /absolute/path/to/plugin.tgz
@@ -95,7 +103,7 @@ allowBuilds:
 
 pi-ai 的非 Codex 依赖 `@google/genai` 和 `protobufjs` 的安装脚本不参与本插件功能，沿用本仓库策略明确拒绝；无需允许它们执行。
 
-这项配置允许安装时执行本插件的构建代码。建议安装时固定经过验证的提交（在 GitHub spec 后追加 `#<commit>`）。本仓库仍保留 `private: true`，尚未提供 npm registry 包名安装。
+这项配置允许安装时执行本插件的构建代码。建议安装时固定经过验证的提交（在 GitHub spec 后追加 `#<commit>`）。npm 包名安装不经过这条 Git 构建流程，推荐普通用户使用 npm 安装。
 
 安装后按 DSH 提示加载插件，在 **设置 → OpenAI** 中登录，再从会话模型选择器中选择订阅模型。GitHub 自动生成的源码压缩包不能直接作为插件安装。
 

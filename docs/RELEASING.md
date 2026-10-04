@@ -1,8 +1,8 @@
 # 发布说明（维护者）
 
-当前版本为 `0.1.2`，面向 DSH `0.2.0-rc.2` 的兼容性发行版，发行范围限定为 Ubuntu / Web。上一个正式 tarball 为 `0.1.1`；本版加入实验性订阅额度、Git prepare 与平台相关修复，仍限定 Ubuntu / Web 验证范围。版本标签不代表 Desktop 或全部账号能力已验收；每版的验证范围与实验能力必须单独记录。`private: true` 保留，用于阻止意外发布到 npm registry，不影响 `npm pack` 或 GitHub Release 附件。GitHub 源码 ZIP/TAR 不含构建产物，不是预构建 Bundle；Git 来源由包管理器执行 prepare 后安装。
+当前版本为 `0.1.3`，面向 DSH `0.2.0-rc.2` 的兼容性发行版，发行范围限定为 Ubuntu / Web。上一个正式 tarball 为 `0.1.2`；本版新增 npm 公开发行配置，运行时功能保持不变，仍限定 Ubuntu / Web 验证范围。版本标签不代表 Desktop 或全部账号能力已验收；每版的验证范围与实验能力必须单独记录。0.1.3 移除 private 限制，使用 publishConfig 指定公开 npm registry 发行；运行时功能与 0.1.2 相同。GitHub 源码 ZIP/TAR 不含构建产物，不是预构建 Bundle；Git 来源由包管理器执行 prepare 后安装。
 
-历史预发布说明见 [v0.0.2](RELEASE_NOTES_v0.0.2.md)，历史正式版说明见 [v0.1.0](RELEASE_NOTES_v0.1.0.md)，历史兼容性发行说明见 [v0.1.1](RELEASE_NOTES_v0.1.1.md)，当前版说明见 [v0.1.2](RELEASE_NOTES_v0.1.2.md)。
+历史预发布说明见 [v0.0.2](RELEASE_NOTES_v0.0.2.md)，历史正式版说明见 [v0.1.0](RELEASE_NOTES_v0.1.0.md)，历史兼容性发行说明见 [v0.1.1](RELEASE_NOTES_v0.1.1.md)，前一版功能与验证记录见 [v0.1.2](RELEASE_NOTES_v0.1.2.md)。
 
 ## 发布前
 
@@ -22,8 +22,14 @@
 
 ## Git 源码安装构建
 
-当前源码新增自包含 `prepare`，与正式构建共享 CSS、ModuleLoader 包装和标准装饰器转换；均先清理 `lib/`，再生成 JS 与类型声明。全部开发依赖使用公开 npm 固定 DSH 版本，pi-ai 补丁随仓库保存。`private: true` 继续保留，本次不发布 npm。
+当前源码新增自包含 `prepare`，与正式构建共享 CSS、ModuleLoader 包装和标准装饰器转换；均先清理 `lib/`，再生成 JS 与类型声明。全部开发依赖使用公开 npm 固定 DSH 版本，pi-ai 补丁随仓库保存。npm 发行使用已经构建并验证的 tarball；Git prepare 保留作为源码安装路径。
 
 Git 安装需要消费者按 pnpm 提示允许该包构建，不得用仓库自身的构建白名单冒充消费者许可。验收须使用无 `lib/`、无 `node_modules/`、无相邻 DSH 源码的克隆，证明 Git 依赖自动触发 prepare，并另验隔离 profile 的 Loader 挂载及卸载。旧发布标签不回写；发布后 README 才可推荐包含新构建支持的标签。
 
 `scripts/verify-profile.mjs` 使用公开 DSH 包检验已安装的隔离 Web profile；调用 `pnpm test:profile /absolute/path/to/isolated-dsh-home`。认证、网络与存储仍为合成测试依赖，不能据此宣布真实账号或 Desktop 通过。
+
+## npm 公开发行
+
+维护者使用有 `@h2mzzz` scope 权限的 npm 账号登录。完成上述验证后，执行 `npm publish /absolute/path/to/verified.tgz --access public --registry=https://registry.npmjs.org/`，发布同一份经过隔离 Loader 验证的产物。先以 `--dry-run` 检查，正式发布后用 `npm view @h2mzzz/dsh-openai-subscription version` 和无构建许可的干净 profile 检查 registry 安装。不得输出或提交 npm token。
+
+用户输入 `@h2mzzz/dsh-openai-subscription` 获取 latest；需要固定版本时追加 `@0.1.3`。此路径不执行本插件的 Git prepare，GitHub 安装仍受消费者的 allowBuilds 策略约束。
