@@ -1,8 +1,7 @@
 {
   "name": "@h2mzzz/dsh-openai-subscription",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Opt-in ChatGPT Codex subscription provider for DeepSeek Harness",
-  "private": true,
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -184,5 +183,13 @@
     "jsdom": "29.1.1",
     "@deepseek-ai/cordis-plugin-loader": "1.0.5"
   },
-  "packageManager": "pnpm@11.7.0"
+  "packageManager": "pnpm@11.7.0",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HuaiminHuang/dsh-subscription-plugin.git"
+  }
 }

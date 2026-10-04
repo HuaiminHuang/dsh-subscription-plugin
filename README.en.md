@@ -70,7 +70,13 @@ Disabling image generation preserves subscription conversations. Disabling the c
 
 ## Installation and first use
 
-Install a built npm `.tgz` package into the Web profile, replacing the example with the actual absolute path:
+Enter `@h2mzzz/dsh-openai-subscription` in DSH’s Add Plugin dialog, or install a pinned version with the CLI:
+
+```sh
+dsh plugin --profile web add @h2mzzz/dsh-openai-subscription@0.1.3
+```
+
+The registry package includes prebuilt files and needs no Git prepare approval. Alternatively, install a built `.tgz` package into the Web profile, replacing the example with the actual absolute path:
 
 ```sh
 dsh plugin --profile web add /absolute/path/to/plugin.tgz
@@ -84,7 +90,7 @@ The source is `chatgpt.com/backend-api/wham/usage`, an undocumented, potentially
 
 This is an independent community plugin, not an official DeepSeek or OpenAI product.
 
-The current version `0.1.2` targets DSH `0.2.0-rc.2` and its patched pi-ai `0.87.1`. The release scope is limited to Ubuntu / Web; Desktop and real-account end-to-end flows remain unverified. Older plugin releases pin DSH `0.1.7-rc.2` and fail the new runtime version preflight.
+The current version `0.1.3` targets DSH `0.2.0-rc.2` and its patched pi-ai `0.87.1`. The release scope is limited to Ubuntu / Web; Desktop and real-account end-to-end flows remain unverified. Older plugin releases pin DSH `0.1.7-rc.2` and fail the new runtime version preflight.
 
 Git source installation is supported in `v0.1.2` through the independent `prepare` build:
 
@@ -103,4 +109,4 @@ allowBuilds:
 
 The pi-ai dependencies `@google/genai` and `protobufjs` do not need installation scripts for this Codex plugin; deny them explicitly as this repository already does.
 
-This permits the plugin's build code to execute during installation. Pin a verified commit by appending `#<commit>` to the Git spec. The package remains private and is not published to the npm registry.
+This permits the plugin's build code to execute during installation. Pin a verified commit by appending `#<commit>` to the Git spec. Registry installation avoids this Git build flow and is recommended for ordinary users.
