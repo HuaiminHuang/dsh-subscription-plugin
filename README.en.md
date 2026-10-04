@@ -5,6 +5,8 @@ kind: "package-bundle"
 
 # OpenAI Subscription for DSH
 
+[![npm version](https://img.shields.io/npm/v/@h2mzzz/dsh-openai-subscription)](https://www.npmjs.com/package/@h2mzzz/dsh-openai-subscription)
+
 [简体中文](README.md) | English
 
 Use OpenAI models through your ChatGPT/Codex subscription in [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH). The plugin provides its own account sign-in, model selection, and image features without replacing DSH's existing OpenAI configuration.

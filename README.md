@@ -5,6 +5,8 @@ kind: "package-bundle"
 
 # OpenAI Subscription for DSH
 
+[![npm version](https://img.shields.io/npm/v/@h2mzzz/dsh-openai-subscription)](https://www.npmjs.com/package/@h2mzzz/dsh-openai-subscription)
+
 简体中文 | [English](README.en.md)
 
 通过 ChatGPT/Codex 订阅在 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）中使用 OpenAI 模型。插件提供独立的账户登录、模型选择和图片功能，不替换 DSH 原有的 OpenAI 配置。
