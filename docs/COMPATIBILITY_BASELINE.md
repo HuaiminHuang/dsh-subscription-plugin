@@ -1,6 +1,6 @@
 # 兼容性基线
 
-## 当前源码：多版本兼容更新（未发布）
+## v0.1.4：多版本兼容更新
 
 2026-11-10 核对官方 npm registry：`@deepseek-ai/dsh` 的 `latest` / `next` 均为 `0.2.2-rc.1`，发布于 2026-11-04。开发依赖固定到该版本，不使用各子包可能滞后的 `latest` 标签。对应 GitHub 标签 `dsh-v0.2.2-rc.1` 提交为 `66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`。
 
@@ -31,7 +31,7 @@
 
 每个矩阵项核对实际安装版本，通过真实 profile 解析、兼容性预检、Loader、ToolRuntime、SkillRegistry，验证订阅路由、生图工具与 Skill、紧凑面板独立开关及完整卸载；随后对安装后的同一产物运行 Host/Client/Remote 注册与撤销、模拟 UI 和 OAuth 模块加载检查。OAuth 在选择登录方式之前取消，不打开回调端口、不调用真实授权端点。
 
-这些检查使用合成凭据与模拟网络/存储，证明包安装、共同 API 与生命周期组合，不代表真实登录、令牌刷新、模型/生图请求、完整浏览器服务器或 Desktop 验收。本次为源码兼容更新，不代表 npm 新版本已发布；已发布 `0.1.3` 的记录不变。
+这些检查使用合成凭据与模拟网络/存储，证明包安装、共同 API 与生命周期组合，不代表真实登录、令牌刷新、模型/生图请求、完整浏览器服务器或 Desktop 验收。此基线对应 `0.1.4`；发行状态以 npm registry 和 GitHub Release 为准，历史 `0.1.3` 的记录不变。
 
 来源：[npm DSH registry](https://registry.npmjs.org/@deepseek-ai%2Fdsh)、[最新上游提交](https://github.com/deepseek-ai/deepseek-harness/tree/66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db)。
 
