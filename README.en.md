@@ -75,7 +75,7 @@ Disabling image generation preserves subscription conversations. Disabling the c
 Enter `@h2mzzz/dsh-openai-subscription` in DSH’s Add Plugin dialog, or install a pinned version with the CLI:
 
 ```sh
-dsh plugin --profile web add @h2mzzz/dsh-openai-subscription@0.1.4
+dsh plugin --profile web add @h2mzzz/dsh-openai-subscription@0.1.5
 ```
 
 The registry package includes prebuilt files and needs no Git prepare approval. Alternatively, install a built `.tgz` package into the Web profile, replacing the example with the actual absolute path:
@@ -86,20 +86,20 @@ dsh plugin --profile web add /absolute/path/to/plugin.tgz
 
 Load the plugin as prompted by DSH, sign in under **Settings → OpenAI**, and select a subscription model in the conversation picker. GitHub-generated source archives are not directly installable plugin packages.
 
-See the [release guide](docs/RELEASING.md) for build and installation instructions, [release notes](docs/RELEASE_NOTES_v0.1.4.md) for verification scope, and [compatibility baseline](docs/COMPATIBILITY_BASELINE.md) for technical requirements. The settings page now includes experimental read-only subscription limits above the initially collapsed model catalog. Host queries the plugin-owned OAuth account, displays server-reported five-hour and weekly windows, remaining percentages, reset countdowns and query time, and caches successful reads for 60 seconds. Manual refresh is available; missing data stays unknown and failed refreshes retain the previous result without invalidating model login.
+See the [release guide](docs/RELEASING.md) for build and installation instructions, [release notes](docs/RELEASE_NOTES_v0.1.5.md) for verification scope, and [compatibility baseline](docs/COMPATIBILITY_BASELINE.md) for technical requirements. The settings page now includes experimental read-only subscription limits above the initially collapsed model catalog. Host queries the plugin-owned OAuth account, displays server-reported five-hour and weekly windows, remaining percentages, reset countdowns and query time, and caches successful reads for 60 seconds. Manual refresh is available; missing data stays unknown and failed refreshes retain the previous result without invalidating model login.
 
 The source is `chatgpt.com/backend-api/wham/usage`, an undocumented, potentially changing HTTP endpoint. An authorized live account and the production parser have been verified. Tokens, email and account IDs are excluded from Client data. Reset-card consumption is not implemented; Windows/macOS GUI validation remains outstanding.
 
 This is an independent community plugin, not an official DeepSeek or OpenAI product.
 
-Version `0.1.4` targets the latest DSH `0.2.2-rc.1` and retains compatibility with `0.2.2-alpha.3`, `0.2.1-rc.5`, and `0.2.0-rc.2`, covering the previous two releases and previous two version series. It bundles its own patched pi-ai `0.87.1` without requiring the host to downgrade pi-ai. See the [compatibility baseline](docs/COMPATIBILITY_BASELINE.md) for exact targets and checks. Validation remains limited to Ubuntu / Web composition with synthetic accounts, not Desktop or real-account end-to-end acceptance.
+Version `0.1.5` targets the latest DSH `0.2.2-rc.1` and retains compatibility with `0.2.2-alpha.3`, `0.2.1-rc.5`, and `0.2.0-rc.2`, covering the previous two releases and previous two version series. It bundles its own patched pi-ai `0.87.1` without requiring the host to downgrade pi-ai. See the [compatibility baseline](docs/COMPATIBILITY_BASELINE.md) for exact targets and checks. Validation remains limited to Ubuntu / Web composition with synthetic accounts, not Desktop or real-account end-to-end acceptance.
 
-Upgrade to `0.1.4` for multi-version compatibility and the `temperature` parameter fix. Historical `0.1.3` declares only DSH `0.2.0-rc.2`.
+Upgrade to `0.1.5` for multi-version compatibility and the `temperature` parameter fix. Historical `0.1.3` declares only DSH `0.2.0-rc.2`.
 
-Git source installation is supported in `v0.1.4` through the independent `prepare` build:
+Git source installation is supported in `v0.1.5` through the independent `prepare` build:
 
 ```sh
-dsh plugin --profile web add github:HuaiminHuang/dsh-subscription-plugin#v0.1.4
+dsh plugin --profile web add github:HuaiminHuang/dsh-subscription-plugin#v0.1.5
 ```
 
 Git installation runs `prepare` and may require pnpm build approval. Prefer the npm package-name installation above. For source installation, follow the [Git build approval guide](docs/RELEASING.md#git-源码安装构建) and retry after configuring the target profile.

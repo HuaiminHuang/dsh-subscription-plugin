@@ -1,4 +1,6 @@
-# v0.1.4
+# v0.1.4（未发布到 npm）
+
+该 tag 的发行流程在 npm 12 打包 JSON 解析检查处失败，尚未执行 npm publish。保留此 tag，不回写；公开发行由 v0.1.5 继续。
 
 本版更新 DSH 多版本兼容，并修复 Codex Responses 拒绝通用 `temperature` 参数导致的请求失败。包名仍为 `@h2mzzz/dsh-openai-subscription`，现有账号存储键、路由与组件开关保持不变。
 

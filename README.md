@@ -70,16 +70,16 @@ Agent 使用可选的 `reference_images` 参数，每项指定当前会话图片
 
 关闭生图工具不影响订阅对话；关闭紧凑模型滑块会恢复原有「模型 / 推理等级」菜单，并保留已选择的思考强度与速度。停用订阅接入后，依赖登录的功能随之停止。
 
-`0.1.4` 面向最新 DSH `0.2.2-rc.1`，同时保留 `0.2.2-alpha.3`、`0.2.1-rc.5` 和 `0.2.0-rc.2` 的兼容性，覆盖前两次发布及前两个版本系列。插件独立打包自己的 pi-ai `0.87.1`，不要求宿主降级 pi-ai。支持范围和验证方法见[兼容性基线](docs/COMPATIBILITY_BASELINE.md)。验证仍限定 Ubuntu / Web 组合与模拟账号，不代表 Desktop 或真实账号端到端验收。
+`0.1.5` 面向最新 DSH `0.2.2-rc.1`，同时保留 `0.2.2-alpha.3`、`0.2.1-rc.5` 和 `0.2.0-rc.2` 的兼容性，覆盖前两次发布及前两个版本系列。插件独立打包自己的 pi-ai `0.87.1`，不要求宿主降级 pi-ai。支持范围和验证方法见[兼容性基线](docs/COMPATIBILITY_BASELINE.md)。验证仍限定 Ubuntu / Web 组合与模拟账号，不代表 Desktop 或真实账号端到端验收。
 
-升级到 `0.1.4` 可获得多版本兼容和 `temperature` 参数修复；历史 `0.1.3` 只声明 DSH `0.2.0-rc.2`。
+升级到 `0.1.5` 可获得多版本兼容和 `temperature` 参数修复；历史 `0.1.3` 只声明 DSH `0.2.0-rc.2`。
 
 ## 安装与开始使用
 
 推荐在 DSH「添加插件」中输入 `@h2mzzz/dsh-openai-subscription`，或通过 CLI 安装指定版本：
 
 ```sh
-dsh plugin --profile web add @h2mzzz/dsh-openai-subscription@0.1.4
+dsh plugin --profile web add @h2mzzz/dsh-openai-subscription@0.1.5
 ```
 
 npm 包包含预构建产物，不需要执行 Git prepare 或添加本插件的构建许可。正式发行的 `.tgz` 也可直接安装到 Web profile，将示例路径替换为实际绝对路径：
@@ -88,17 +88,17 @@ npm 包包含预构建产物，不需要执行 Git prepare 或添加本插件的
 dsh plugin --profile web add /absolute/path/to/plugin.tgz
 ```
 
-GitHub 源码安装（`v0.1.4`，需要安装时构建许可）：
+GitHub 源码安装（`v0.1.5`，需要安装时构建许可）：
 
 ```sh
-dsh plugin --profile web add github:HuaiminHuang/dsh-subscription-plugin#v0.1.4
+dsh plugin --profile web add github:HuaiminHuang/dsh-subscription-plugin#v0.1.5
 ```
 
 GitHub 安装需要执行 `prepare`，可能被 pnpm 的构建许可拦截。普通用户推荐使用上面的 npm 包名安装；需要源码安装时，按[Git 构建许可说明](docs/RELEASING.md#git-源码安装构建)配置目标 profile 后重试。
 
 安装后按 DSH 提示加载插件，在 **设置 → OpenAI** 中登录，再从会话模型选择器中选择订阅模型。GitHub 自动生成的源码压缩包不能直接作为插件安装。
 
-构建与安装说明见[发布指南](docs/RELEASING.md)，验证范围见[发布记录](docs/RELEASE_NOTES_v0.1.4.md)，技术要求见[兼容性基线](docs/COMPATIBILITY_BASELINE.md)。设置页已加入实验性的只读订阅额度查询：使用本插件保存的 OAuth 在 Host 查询五小时与每周窗口，显示剩余比例、重置倒计时和查询时间；限额位于默认折叠的模型列表上方。进入页面时查询，60 秒内复用缓存，也可手动刷新。缺失数据显示未知，刷新失败保留上次数据，不影响模型登录。
+构建与安装说明见[发布指南](docs/RELEASING.md)，验证范围见[发布记录](docs/RELEASE_NOTES_v0.1.5.md)，技术要求见[兼容性基线](docs/COMPATIBILITY_BASELINE.md)。设置页已加入实验性的只读订阅额度查询：使用本插件保存的 OAuth 在 Host 查询五小时与每周窗口，显示剩余比例、重置倒计时和查询时间；限额位于默认折叠的模型列表上方。进入页面时查询，60 秒内复用缓存，也可手动刷新。缺失数据显示未知，刷新失败保留上次数据，不影响模型登录。
 
 额度来源为 `chatgpt.com/backend-api/wham/usage`，它不是稳定公开的 HTTP API，可能随服务端变化失效。已用授权账户验证真实响应和生产解析模块；不读取其他应用凭据，不向 Client 发送 token、邮箱或账户 ID。未实现重置卡消费，Windows/macOS 的实际 GUI 尚未验收。
 

@@ -1,3 +1,4 @@
+import { parseNpmPack } from './parse-npm-pack.mjs'
 import assert from 'node:assert/strict'
 import { TYPERT } from '../lib/typert.host.js'
 import { TYPERT_REMOTE } from '../lib/typert.remote-client.js'
@@ -66,7 +67,7 @@ const pack = spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['pack'
 if (pack.error !== undefined) throw pack.error
 if (pack.signal !== null) throw new Error(`npm pack terminated by ${pack.signal}`)
 if (pack.status !== 0) throw new Error(`npm pack --dry-run failed: ${pack.stderr.trim()}`)
-const packedFiles = new Set(JSON.parse(pack.stdout)[0].files.map(entry => entry.path))
+const packedFiles = new Set(parseNpmPack(pack.stdout, metadata).files.map(entry => entry.path))
 const builtModules = readdirSync(new URL('../lib', import.meta.url))
   .filter(name => name.endsWith('.js') || name.endsWith('.js.map'))
   .map(name => `lib/${name}`)

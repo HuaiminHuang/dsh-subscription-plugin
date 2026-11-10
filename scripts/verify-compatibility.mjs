@@ -1,3 +1,4 @@
+import { parseNpmPack, parseNpmPeerDependencies } from './parse-npm-pack.mjs'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -30,13 +31,12 @@ function run(command, args, cwd, env = {}, capture = false) {
 try {
   const scripts = join(temporary, 'scripts')
   await mkdir(scripts)
-  for (const script of ['verify-profile.mjs', 'verify-package.mjs', 'load-browser-module.mjs']) {
+  for (const script of ['verify-profile.mjs', 'verify-package.mjs', 'load-browser-module.mjs', 'parse-npm-pack.mjs']) {
     await copyFile(join(root, 'scripts', script), join(scripts, script))
   }
-  const packed = JSON.parse(run(npm, ['pack', '--ignore-scripts', '--json', '--pack-destination', temporary], root, {}, true))
-  assert.equal(packed.length, 1)
-  const artifact = join(temporary, packed[0].filename)
-  console.log(`Testing one artifact: ${packed[0].filename} (${packed[0].shasum})`)
+  const packed = parseNpmPack(run(npm, ['pack', '--ignore-scripts', '--json', '--pack-destination', temporary], root, {}, true), metadata)
+  const artifact = join(temporary, packed.filename)
+  console.log(`Testing one artifact: ${packed.filename} (${packed.shasum})`)
   for (const version of selected.length ? selected : versions) {
     console.log(`\n=== DSH ${version} ===`)
     const lane = join(temporary, version)
@@ -46,8 +46,8 @@ try {
     await mkdir(join(lane, 'scripts'))
     // Query the runtime's own Cordis ranges: old DSH uses Cordis 4.0, new DSH
     // uses 4.1. Pin all DSH peers explicitly to prevent a mixed-version runtime.
-    const bootPeers = JSON.parse(run(npm, ['view', `@deepseek-ai/dsh-app-boot@${version}`, 'peerDependencies', '--json', '--registry=https://registry.npmjs.org'], lane, {}, true))
-    const settingsPeers = JSON.parse(run(npm, ['view', `@deepseek-ai/dsh-settings@${version}`, 'peerDependencies', '--json', '--registry=https://registry.npmjs.org'], lane, {}, true))
+    const bootPeers = parseNpmPeerDependencies(run(npm, ['view', `@deepseek-ai/dsh-app-boot@${version}`, 'peerDependencies', '--json', '--registry=https://registry.npmjs.org'], lane, {}, true))
+    const settingsPeers = parseNpmPeerDependencies(run(npm, ['view', `@deepseek-ai/dsh-settings@${version}`, 'peerDependencies', '--json', '--registry=https://registry.npmjs.org'], lane, {}, true))
     const dependencies = Object.fromEntries(Object.entries(bootPeers).map(([name, range]) => [name, name.startsWith('@deepseek-ai/dsh-') ? version : range]))
     for (const name of Object.keys(metadata.peerDependencies)) {
       dependencies[name] = name.startsWith('@deepseek-ai/dsh-') ? version : (dependencies[name] ?? metadata.peerDependencies[name])
@@ -74,7 +74,7 @@ try {
     run(process.execPath, [join(lane, 'scripts/verify-profile.mjs'), home, 'compatibility'], lane, env)
     const installedPlugin = join(lane, 'node_modules', metadata.name)
     await mkdir(join(installedPlugin, 'scripts'))
-    for (const script of ['verify-package.mjs', 'load-browser-module.mjs']) {
+    for (const script of ['verify-package.mjs', 'load-browser-module.mjs', 'parse-npm-pack.mjs']) {
       await copyFile(join(scripts, script), join(installedPlugin, 'scripts', script))
     }
     run(process.execPath, [join(installedPlugin, 'scripts/verify-package.mjs')], installedPlugin, env)

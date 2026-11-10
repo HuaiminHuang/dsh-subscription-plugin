@@ -1,10 +1,10 @@
 # 发布说明（维护者）
 
-当前版本为 `0.1.4`，包含 DSH 多版本兼容和 Codex `temperature` 参数修复，精确目标与矩阵见[兼容性基线](COMPATIBILITY_BASELINE.md)。不得覆盖已发布版本；运行 `pnpm test:compatibility` 验证同一个构建包在全部四个目标版本上的安装、挂载和卸载。发行是否成功以 npm registry 和 GitHub Actions 的实际结果为准。
+当前版本为 `0.1.5`，包含 DSH 多版本兼容和 Codex `temperature` 参数修复，精确目标与矩阵见[兼容性基线](COMPATIBILITY_BASELINE.md)。不得覆盖已发布版本；运行 `pnpm test:compatibility` 验证同一个构建包在全部四个目标版本上的安装、挂载和卸载。发行是否成功以 npm registry 和 GitHub Actions 的实际结果为准。
 
 验证范围仍为 Ubuntu / Web 组合；Windows/macOS CI 通过不代表 Desktop 或真实账号端到端验收。GitHub 源码 ZIP/TAR 不含构建产物，不是预构建 Bundle；Git 来源由包管理器执行 prepare 后安装。
 
-历史预发布说明见 [v0.0.2](RELEASE_NOTES_v0.0.2.md)，历史正式版说明见 [v0.1.0](RELEASE_NOTES_v0.1.0.md)，历史兼容性发行说明见 [v0.1.1](RELEASE_NOTES_v0.1.1.md)，历史功能与验证记录见 [v0.1.2](RELEASE_NOTES_v0.1.2.md)，前一版公开 npm 发行见 [v0.1.3](RELEASE_NOTES_v0.1.3.md)，当前发行记录见 [v0.1.4](RELEASE_NOTES_v0.1.4.md)。
+历史预发布说明见 [v0.0.2](RELEASE_NOTES_v0.0.2.md)，历史正式版说明见 [v0.1.0](RELEASE_NOTES_v0.1.0.md)，历史兼容性发行说明见 [v0.1.1](RELEASE_NOTES_v0.1.1.md)，历史功能与验证记录见 [v0.1.2](RELEASE_NOTES_v0.1.2.md)，前一版公开 npm 发行见 [v0.1.3](RELEASE_NOTES_v0.1.3.md)，当前发行记录见 [v0.1.5](RELEASE_NOTES_v0.1.5.md)。
 
 ## 发布前
 
@@ -13,6 +13,8 @@
 3. 同步 `package.json`、AGENTS.md、中英文 README、发布说明和附件文件名。检查 MIT LICENSE、目录与 tarball 内容，排除凭据、OAuth 回调、本机 profile 数据和诊断私有产物。
 
 ## 构建与保存
+
+CI 与发布流程统一固定 npm `12.2.2`、pnpm `11.7.0`，避免发行时临时升级 CLI 导致包检查与 CI 行为不同。
 
 使用本仓库实际定义的 `pnpm typecheck`、`pnpm test`、`pnpm test:package`，执行 `pnpm test:compatibility`、`npm pack --dry-run` 和 `git diff --check`。新安装依赖时使用 `pnpm install --frozen-lockfile --ignore-scripts`，不要为已有环境隐式升级依赖。
 
@@ -45,7 +47,7 @@ pi-ai 的非 Codex 依赖 @google/genai 和 protobufjs 的安装脚本不参与�
 
 维护者使用有 `@h2mzzz` scope 权限的 npm 账号登录。完成上述验证后，执行 `npm publish /absolute/path/to/verified.tgz --access public --registry=https://registry.npmjs.org/`，发布同一份经过隔离 Loader 验证的产物。先以 `--dry-run` 检查，正式发布后用 `npm view @h2mzzz/dsh-openai-subscription version` 和无构建许可的干净 profile 检查 registry 安装。不得输出或提交 npm token。
 
-用户输入 `@h2mzzz/dsh-openai-subscription` 获取 latest；需要固定版本时追加 `@0.1.4`。此路径不执行本插件的 Git prepare，GitHub 安装仍受消费者的 allowBuilds 策略约束。
+用户输入 `@h2mzzz/dsh-openai-subscription` 获取 latest；需要固定版本时追加 `@0.1.5`。此路径不执行本插件的 Git prepare，GitHub 安装仍受消费者的 allowBuilds 策略约束。
 
 ## GitHub Actions 发行同步
 
