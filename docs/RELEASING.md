@@ -1,10 +1,10 @@
 # 发布说明（维护者）
 
-当前工作区另有尚未发布的多版本兼容更新，目标与矩阵见[兼容性基线](COMPATIBILITY_BASELINE.md)。发布此更新前必须分配新版本，不能覆盖 `0.1.3`；运行 `pnpm test:compatibility` 验证同一个构建包在全部四个目标版本上的安装、挂载和卸载。
+当前版本为 `0.1.4`，包含 DSH 多版本兼容和 Codex `temperature` 参数修复，精确目标与矩阵见[兼容性基线](COMPATIBILITY_BASELINE.md)。不得覆盖已发布版本；运行 `pnpm test:compatibility` 验证同一个构建包在全部四个目标版本上的安装、挂载和卸载。发行是否成功以 npm registry 和 GitHub Actions 的实际结果为准。
 
-已发布版本为 `0.1.3`，面向 DSH `0.2.0-rc.2` 的兼容性发行版，发行范围限定为 Ubuntu / Web。上一个正式 tarball 为 `0.1.2`；本版新增 npm 公开发行配置，运行时功能保持不变，仍限定 Ubuntu / Web 验证范围。版本标签不代表 Desktop 或全部账号能力已验收；每版的验证范围与实验能力必须单独记录。0.1.3 移除 private 限制，使用 publishConfig 指定公开 npm registry 发行；运行时功能与 0.1.2 相同。GitHub 源码 ZIP/TAR 不含构建产物，不是预构建 Bundle；Git 来源由包管理器执行 prepare 后安装。
+验证范围仍为 Ubuntu / Web 组合；Windows/macOS CI 通过不代表 Desktop 或真实账号端到端验收。GitHub 源码 ZIP/TAR 不含构建产物，不是预构建 Bundle；Git 来源由包管理器执行 prepare 后安装。
 
-历史预发布说明见 [v0.0.2](RELEASE_NOTES_v0.0.2.md)，历史正式版说明见 [v0.1.0](RELEASE_NOTES_v0.1.0.md)，历史兼容性发行说明见 [v0.1.1](RELEASE_NOTES_v0.1.1.md)，前一版功能与验证记录见 [v0.1.2](RELEASE_NOTES_v0.1.2.md)，当前发行记录见 [v0.1.3](RELEASE_NOTES_v0.1.3.md)。
+历史预发布说明见 [v0.0.2](RELEASE_NOTES_v0.0.2.md)，历史正式版说明见 [v0.1.0](RELEASE_NOTES_v0.1.0.md)，历史兼容性发行说明见 [v0.1.1](RELEASE_NOTES_v0.1.1.md)，历史功能与验证记录见 [v0.1.2](RELEASE_NOTES_v0.1.2.md)，前一版公开 npm 发行见 [v0.1.3](RELEASE_NOTES_v0.1.3.md)，当前发行记录见 [v0.1.4](RELEASE_NOTES_v0.1.4.md)。
 
 ## 发布前
 
@@ -45,11 +45,11 @@ pi-ai 的非 Codex 依赖 @google/genai 和 protobufjs 的安装脚本不参与�
 
 维护者使用有 `@h2mzzz` scope 权限的 npm 账号登录。完成上述验证后，执行 `npm publish /absolute/path/to/verified.tgz --access public --registry=https://registry.npmjs.org/`，发布同一份经过隔离 Loader 验证的产物。先以 `--dry-run` 检查，正式发布后用 `npm view @h2mzzz/dsh-openai-subscription version` 和无构建许可的干净 profile 检查 registry 安装。不得输出或提交 npm token。
 
-用户输入 `@h2mzzz/dsh-openai-subscription` 获取 latest；需要固定版本时追加 `@0.1.3`。此路径不执行本插件的 Git prepare，GitHub 安装仍受消费者的 allowBuilds 策略约束。
+用户输入 `@h2mzzz/dsh-openai-subscription` 获取 latest；需要固定版本时追加 `@0.1.4`。此路径不执行本插件的 Git prepare，GitHub 安装仍受消费者的 allowBuilds 策略约束。
 
 ## GitHub Actions 发行同步
 
-`.github/workflows/release.yml` 在 GitHub Release 发布时执行，也支持手动输入已有稳定标签补跑。工作流检验 tag 与 package.json 版本一致，运行类型检查、测试和构建包检查；版本不存在才发布 npm，已有版本直接从 npm 下载。Release 附件因此来自 registry 的实际产物，附带 SHA256SUMS。候选版暂不通过此稳定版工作流发布；隔离 Loader、真实账号和平台验收仍须按发布前清单独立完成。
+`.github/workflows/release.yml` 在稳定版本 tag 推送或 GitHub Release 发布时执行，也支持手动输入已有稳定标签补跑。工作流检验 tag 与 package.json 版本一致，运行类型检查、测试、构建包检查和四版本兼容矩阵；版本不存在才发布 npm，已有版本直接从 npm 下载。发布成功后，若 Release 不存在，使用该 tag 和仓库中的版本发布说明创建普通 Release。Release 附件因此来自 registry 的实际产物，附带 SHA256SUMS。候选版暂不通过此稳定版工作流发布；隔离 Loader、真实账号和平台验收仍须按发布前清单独立完成。
 
 自动发布前，在 npm 包 Settings → Trusted publishing 配置 GitHub Actions：Owner `HuaiminHuang`，Repository `dsh-subscription-plugin`，Workflow `release.yml`，允许 npm publish，不设置 Environment。工作流使用 OIDC，无需 NPM_TOKEN；没有此绑定时新版本自动发布会失败，但已发布版本的同步不需要 npm 写权限。
 
