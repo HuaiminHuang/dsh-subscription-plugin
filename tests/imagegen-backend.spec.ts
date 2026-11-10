@@ -23,6 +23,25 @@ describe('Codex subscription image request', () => {
     expect(saveImages).toHaveBeenCalledWith([{ data: png, mediaType: 'image/png', name: 'generated-image.png' }])
   })
 
+  it.each([false, true])('keeps sampling options off the image endpoint (references: %s)', async editing => {
+    const fetcher = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(init!.body as string)
+      if ('temperature' in body) return response({ error: { message: 'Unsupported parameter: temperature' } }, { status: 400 })
+      return response({ data: [{ b64_json: png.toString('base64') }] })
+    })
+    const saveImages = vi.fn(async () => [{ attachmentId: 'saved', mediaType: 'image/png', bytes: png.length, width: 1, height: 1 }])
+    const references = editing ? [{ data: png, mediaType: 'image/png' as const }] : []
+    await generateImage({ fetcher, saveImages }, jwt('account-1'), 'Keep the blue star', new AbortController().signal, references)
+    expect(fetcher).toHaveBeenCalledOnce()
+    const [url, init] = fetcher.mock.calls[0]!
+    expect(url).toBe(`https://chatgpt.com/backend-api/codex/images/${editing ? 'edits' : 'generations'}`)
+    expect(JSON.parse(init!.body as string)).toEqual({
+      model: 'gpt-image-2', prompt: 'Keep the blue star', background: 'auto', quality: 'auto', size: 'auto',
+      ...(editing ? { images: [{ image_url: `data:image/png;base64,${png.toString('base64')}` }] } : {}),
+    })
+    expect(saveImages).toHaveBeenCalledOnce()
+  })
+
   it.each([
     ['invalid claim', 'not-jwt', response({ data: [{ b64_json: png.toString('base64') }] })],
     ['refusal', jwt('account-1'), response({ message: 'private provider detail' }, { status: 403 })],

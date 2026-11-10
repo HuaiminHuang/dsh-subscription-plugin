@@ -65,6 +65,8 @@ export default defineConfig([
     },
     outDir: 'lib', format: ['esm'], platform: 'node', target: 'es2024',
     fixedExtension: false, dts: false, clean: false,
+    // Keep the patched Codex implementation independent of DSH's newer pi-ai.
+    deps: { alwaysBundle: /^@earendil-works\/pi-ai(?:\/|$)/ },
     outputOptions: { chunkFileNames: '[name].js' },
     // Reflection descriptors are package-owned; only decorator lowering is needed.
     plugins: [standardDecorators],

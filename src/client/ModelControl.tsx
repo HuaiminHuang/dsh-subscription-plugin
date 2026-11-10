@@ -9,7 +9,8 @@ import { useModelPanelPosition } from './use-model-panel-position.ts'
 import { sliderStops } from './model-options.ts'
 import css from './ModelControl.module.css'
 
-export interface ModelControlInjected extends ModelSelectInjected {
+// Depend on the shared directory contract, not optional UI fields added by newer DSH.
+export interface ModelControlInjected extends Pick<ModelSelectInjected, 'available' | 'directory' | 'load' | 'select'> {
   controls?: { subscribe(listener: () => void): () => void; getSnapshot(): CodexSubscriptionState }
   getSpeed(model: string): Promise<CodexSpeedState>
   setSpeed(model: string, enabled: boolean): Promise<CodexSpeedState>

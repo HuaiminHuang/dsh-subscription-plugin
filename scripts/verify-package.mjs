@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict'
 import { TYPERT } from '../lib/typert.host.js'
 import { TYPERT_REMOTE } from '../lib/typert.remote-client.js'
 import { validateTypertManifest } from '@deepseek-ai/dsh-typert-loader'
@@ -22,11 +23,16 @@ const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf
 // Exercise the same version preflight used by the running DSH, before activation.
 const runtimeVersion = getDshRuntimeVersion()
 const compatibility = evaluatePluginCompatibility(metadata, {}, runtimeVersion)
-if (runtimeVersion !== '0.2.0-rc.2' || compatibility !== undefined) {
-  throw new Error(`Bundle must pass the pinned DSH 0.2.0-rc.2 preflight (runtime: ${runtimeVersion})`)
+if (!metadata.peerDependencies['@deepseek-ai/dsh-llm'].split(' || ').includes(runtimeVersion) || compatibility !== undefined) {
+  throw new Error(`Bundle must pass the declared DSH compatibility preflight (runtime: ${runtimeVersion})`)
 }
+for (const supported of metadata.peerDependencies['@deepseek-ai/dsh-llm'].split(' || ')) {
+  assert.equal(evaluatePluginCompatibility(metadata, {}, supported), undefined)
+}
+assert.notEqual(evaluatePluginCompatibility(metadata, {}, '0.2.3-rc.1'), undefined,
+  'Unverified DSH releases must not silently pass the compatibility preflight')
 const piVersion = JSON.parse(readFileSync(new URL('../package.json', import.meta.resolve('@earendil-works/pi-ai')), 'utf8')).version
-if (piVersion !== metadata.peerDependencies['@earendil-works/pi-ai']) {
+if (piVersion !== metadata.dependencies['@earendil-works/pi-ai']) {
   throw new Error('Built package validation must use the declared pi-ai version')
 }
 
@@ -72,7 +78,10 @@ if (unpacks.length > 0) {
 // further chunk cannot slip past a check that only reads the entry points.
 for (const module of builtModules.filter(name => name.endsWith('.js'))) {
   const source = readFileSync(new URL(`../${module}`, import.meta.url), 'utf8')
-  for (const specifier of source.matchAll(/from "(\.\/[^"]+)"/gu)) {
+  if (/from ["']@earendil-works\/pi-ai|import\(["']@earendil-works\/pi-ai/u.test(source)) {
+    throw new Error(`${module} must use the plugin-owned bundled pi-ai, not DSH's version`)
+  }
+  for (const specifier of source.matchAll(/(?:from\s*|import\()["'](\.\/[^"']+)["']/gu)) {
     const resolved = `lib/${specifier[1].slice(2)}`
     if (!packedFiles.has(resolved)) {
       throw new Error(`${module} imports ${resolved}, which the tarball does not contain`)
@@ -105,7 +114,12 @@ let mountedImageTool
 let mountedImageSkill
 let imageRoute
 hostCtx.provide('llm', { registerAdapter: () => () => {} })
-hostCtx.provide('credentials', { readRecord: async () => undefined, deleteRecord: async () => {} })
+let hostCredential
+hostCtx.provide('credentials', {
+  readRecord: async () => hostCredential,
+  modifyRecord: async (_key, mutate) => { hostCredential = await mutate(hostCredential); return hostCredential },
+  deleteRecord: async () => { hostCredential = undefined },
+})
 hostCtx.provide('authorization', { registerFlow: () => () => {}, cancel: () => {} })
 hostCtx.provide('tools', { register: tool => { mountedImageTool = tool; return () => { mountedImageTool = undefined } } })
 hostCtx.provide('skills', { register: skill => { mountedImageSkill = skill; return () => { mountedImageSkill = undefined } } })
@@ -117,6 +131,79 @@ try {
   await fiber
   if (imageRoute !== undefined) throw new Error('Text row must not mount the independently switchable image feature')
   const controller = hostCtx.get('codexSubscription')
+  // Reaching the real provider's method selector proves its lazy OAuth module
+  // survived packaging. Abort before opening a port or contacting any service.
+  const cancelledLogin = new Error('package-smoke-login-cancelled')
+  let reachedMethodSelector = false
+  await assert.rejects(controller.models.login('openai-codex', 'oauth', {
+    signal: AbortSignal.timeout(5_000),
+    prompt: async prompt => {
+      assert.equal(prompt.type, 'select')
+      assert.deepEqual(prompt.options.map(option => option.id), ['browser', 'device_code'])
+      reachedMethodSelector = true
+      throw cancelledLogin
+    },
+    notify: () => { throw new Error('Login must stop before authorization starts') },
+  }), error => error === cancelledLogin)
+  assert(reachedMethodSelector, 'Packaged Codex OAuth flow must be loadable')
+  // Exercise the actual bundled lazy streaming chunk, not a source mock. This
+  // synthetic token and injected transport never leave the current process.
+  const syntheticAccess = `synthetic.${Buffer.from(JSON.stringify({
+    'https://api.openai.com/auth': { chatgpt_account_id: 'package-smoke-account' },
+  })).toString('base64url')}.signature`
+  hostCredential = { kind: 'grant', payload: { type: 'oauth', access: syntheticAccess, refresh: 'synthetic-refresh', expires: Date.now() + 3_600_000 } }
+  const model = controller.models.getModels('openai-codex')[0]
+  assert(model)
+  const textItem = { type: 'message', id: 'msg-test', role: 'assistant', content: [{ type: 'output_text', text: 'Hello' }] }
+  const toolItem = { type: 'function_call', id: 'fc-test', call_id: 'call-test', name: 'read_file', arguments: '{"path":"README.md"}' }
+  const responseEvents = [
+    { type: 'response.created', response: { id: 'resp-test' } },
+    { type: 'response.output_item.added', output_index: 0, item: { ...textItem, content: [] } },
+    { type: 'response.output_text.delta', output_index: 0, delta: 'Hello' },
+    { type: 'response.output_item.done', output_index: 0, item: textItem },
+    { type: 'response.output_item.added', output_index: 1, item: { ...toolItem, arguments: '' } },
+    { type: 'response.function_call_arguments.delta', output_index: 1, delta: '{"path":' },
+    { type: 'response.function_call_arguments.delta', output_index: 1, delta: '"README.md"}' },
+    { type: 'response.function_call_arguments.done', output_index: 1, arguments: toolItem.arguments },
+    { type: 'response.output_item.done', output_index: 1, item: toolItem },
+    { type: 'response.completed', response: { id: 'resp-test', status: 'completed', output: [textItem, toolItem],
+      usage: { input_tokens: 12, output_tokens: 7, total_tokens: 19 } } },
+  ]
+  let requests = 0
+  const events = []
+  const streamOptions = { apiKey: syntheticAccess, transport: 'sse', maxRetries: 0 }
+  for await (const event of controller.models.streamSimple(model, { messages: [] }, {
+    ...streamOptions, signal: AbortSignal.timeout(5_000),
+    fetch: async (url, init) => {
+      requests++
+      assert.equal(new URL(url).pathname, '/backend-api/codex/responses')
+      assert(init.signal)
+      return new Response(responseEvents.map(value => `data: ${JSON.stringify(value)}\n\n`).join(''),
+        { headers: { 'Content-Type': 'text/event-stream' } })
+    },
+  })) events.push(structuredClone(event))
+  assert.equal(requests, 1, events.at(-1)?.error?.errorMessage)
+  assert.equal(events.find(event => event.type === 'text_delta')?.delta, 'Hello')
+  assert.equal(events.filter(event => event.type === 'toolcall_delta').map(event => event.delta).join(''), toolItem.arguments)
+  assert.deepEqual(events.find(event => event.type === 'toolcall_end')?.toolCall.arguments, { path: 'README.md' })
+  assert.equal(events.at(-1)?.type, 'done')
+  assert.equal(events.at(-1)?.reason, 'toolUse')
+  assert.equal(events.at(-1)?.message.usage.totalTokens, 19)
+  const abortStream = new AbortController()
+  let transportAborted = false
+  const cancelledEvents = []
+  for await (const event of controller.models.streamSimple(model, { messages: [] }, {
+    ...streamOptions, signal: AbortSignal.any([abortStream.signal, AbortSignal.timeout(5_000)]),
+    fetch: async (_url, init) => {
+      abortStream.abort(new Error('package-smoke-stream-cancelled'))
+      transportAborted = init.signal.aborted
+      throw init.signal.reason
+    },
+  })) cancelledEvents.push(event)
+  assert(transportAborted, 'Cancellation must reach the bundled transport')
+  assert.equal(cancelledEvents.at(-1)?.type, 'error')
+  assert.equal(cancelledEvents.at(-1)?.error.stopReason, 'aborted')
+  hostCredential = undefined
   if (controller.getState().compactModelControl !== false) throw new Error('Compact view leaked outside its owner')
   const controlFiber = hostCtx.plugin({ inject: controlInject, apply: mountControl })
   await controlFiber

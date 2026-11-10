@@ -1,18 +1,20 @@
 # 发布说明（维护者）
 
-当前版本为 `0.1.3`，面向 DSH `0.2.0-rc.2` 的兼容性发行版，发行范围限定为 Ubuntu / Web。上一个正式 tarball 为 `0.1.2`；本版新增 npm 公开发行配置，运行时功能保持不变，仍限定 Ubuntu / Web 验证范围。版本标签不代表 Desktop 或全部账号能力已验收；每版的验证范围与实验能力必须单独记录。0.1.3 移除 private 限制，使用 publishConfig 指定公开 npm registry 发行；运行时功能与 0.1.2 相同。GitHub 源码 ZIP/TAR 不含构建产物，不是预构建 Bundle；Git 来源由包管理器执行 prepare 后安装。
+当前工作区另有尚未发布的多版本兼容更新，目标与矩阵见[兼容性基线](COMPATIBILITY_BASELINE.md)。发布此更新前必须分配新版本，不能覆盖 `0.1.3`；运行 `pnpm test:compatibility` 验证同一个构建包在全部四个目标版本上的安装、挂载和卸载。
+
+已发布版本为 `0.1.3`，面向 DSH `0.2.0-rc.2` 的兼容性发行版，发行范围限定为 Ubuntu / Web。上一个正式 tarball 为 `0.1.2`；本版新增 npm 公开发行配置，运行时功能保持不变，仍限定 Ubuntu / Web 验证范围。版本标签不代表 Desktop 或全部账号能力已验收；每版的验证范围与实验能力必须单独记录。0.1.3 移除 private 限制，使用 publishConfig 指定公开 npm registry 发行；运行时功能与 0.1.2 相同。GitHub 源码 ZIP/TAR 不含构建产物，不是预构建 Bundle；Git 来源由包管理器执行 prepare 后安装。
 
 历史预发布说明见 [v0.0.2](RELEASE_NOTES_v0.0.2.md)，历史正式版说明见 [v0.1.0](RELEASE_NOTES_v0.1.0.md)，历史兼容性发行说明见 [v0.1.1](RELEASE_NOTES_v0.1.1.md)，前一版功能与验证记录见 [v0.1.2](RELEASE_NOTES_v0.1.2.md)，当前发行记录见 [v0.1.3](RELEASE_NOTES_v0.1.3.md)。
 
 ## 发布前
 
 1. 验证登录生命周期、目标 DSH 的真实 Loader 组合、构建包安装与卸载。真实账号授权、模型调用和 Desktop 分别记录；未运行的检查不得写成已通过。没有验证的平台和能力不纳入正式版支持承诺。
-2. 核对 DSH `639ed015397290b3745d163aafe02ffee4aa3f84`（`0.2.0-rc.2`） 与固定 pi-ai 补丁。优先使用干净检出；若沿用本机参考检出，按兼容性基线审查并记录差异，不能重置用户工作。仅 Desktop 构建差异不得据此声明 Desktop 兼容。
+2. 核对[兼容性基线](COMPATIBILITY_BASELINE.md)中最新 DSH `0.2.2-rc.1` 和全部三个向后兼容目标，以及插件独立打包的固定 pi-ai 补丁。使用同一产物运行四版本矩阵；不能仅放宽 peer 范围便宣称支持。仅 Desktop 构建差异不得据此声明 Desktop 兼容。
 3. 同步 `package.json`、AGENTS.md、中英文 README、发布说明和附件文件名。检查 MIT LICENSE、目录与 tarball 内容，排除凭据、OAuth 回调、本机 profile 数据和诊断私有产物。
 
 ## 构建与保存
 
-使用本仓库实际定义的 `pnpm typecheck`、`pnpm test`、`pnpm test:package`，执行 `npm pack --dry-run` 和 `git diff --check`。新安装依赖时使用 `pnpm install --frozen-lockfile --ignore-scripts`，不要为已有环境隐式升级依赖。
+使用本仓库实际定义的 `pnpm typecheck`、`pnpm test`、`pnpm test:package`，执行 `pnpm test:compatibility`、`npm pack --dry-run` 和 `git diff --check`。新安装依赖时使用 `pnpm install --frozen-lockfile --ignore-scripts`，不要为已有环境隐式升级依赖。
 
 正式产物必须从独立源码快照全新构建，不能依赖旧 `lib/` 的残留共享模块。运行 `npm pack`，保存 `h2mzzz-dsh-openai-subscription-<版本>.tgz` 与 `SHA256SUMS`。将该 tarball 放入隔离 Loader 测试环境，检查挂载、独立开关、模型路由/Remote/工具/Skill/读取路由撤销；Client 的槽位注册与撤销另外检查。
 

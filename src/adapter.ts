@@ -101,7 +101,8 @@ export class CodexSubscriptionAdapter extends LlmAdapter {
     request.signal.throwIfAborted()
     const events = this.controller.models.streamSimple(model, context, {
       signal: request.signal,
-      ...options.temperature === undefined ? {} : { temperature: options.temperature },
+      // Codex subscription Responses does not accept sampling temperature. DSH may
+      // supply a general-purpose default, so keep it off this endpoint entirely.
       ...options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens },
       ...options.sessionId === undefined ? {} : { sessionId: String(options.sessionId) },
       ...reasoning === undefined ? {} : { reasoning },

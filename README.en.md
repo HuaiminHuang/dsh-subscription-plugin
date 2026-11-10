@@ -92,7 +92,9 @@ The source is `chatgpt.com/backend-api/wham/usage`, an undocumented, potentially
 
 This is an independent community plugin, not an official DeepSeek or OpenAI product.
 
-The current version `0.1.3` targets DSH `0.2.0-rc.2` and its patched pi-ai `0.87.1`. The release scope is limited to Ubuntu / Web; Desktop and real-account end-to-end flows remain unverified. Older plugin releases pin DSH `0.1.7-rc.2` and fail the new runtime version preflight.
+The current working-tree source targets the latest DSH `0.2.2-rc.1` and retains compatibility with `0.2.2-alpha.3`, `0.2.1-rc.5`, and `0.2.0-rc.2`, covering the previous two releases and previous two version series. It bundles its own patched pi-ai `0.87.1` without requiring the host to downgrade pi-ai. See the [compatibility baseline](docs/COMPATIBILITY_BASELINE.md) for exact targets and checks. Validation remains limited to Ubuntu / Web composition with synthetic accounts, not Desktop or real-account end-to-end acceptance.
+
+This compatibility update is not published. npm / GitHub `0.1.3` still declares only DSH `0.2.0-rc.2`. To use the updated source, build and pack it locally, then install the resulting `.tgz` into the target profile. The published `0.1.3` commands below do not install this unreleased update.
 
 Git source installation is supported in `v0.1.3` through the independent `prepare` build:
 

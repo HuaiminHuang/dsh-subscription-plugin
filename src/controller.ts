@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { Context } from '@deepseek-ai/cordis'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { createModels } from '@earendil-works/pi-ai'
+import { registerBunOAuthFlows } from '@earendil-works/pi-ai/bun-oauth'
 import type { Api, AuthEvent, AuthPrompt, Credential, Model, MutableModels } from '@earendil-works/pi-ai'
 import type { AuthorizationFlow, AuthorizationNotice } from '@deepseek-ai/dsh-authorization'
 import { LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
@@ -19,6 +20,11 @@ import { CodexSubscriptionAdapter } from './adapter.ts'
 import { CODEX_CREDENTIAL_KEY, PI_PROVIDER_ID, PROVIDER_ID } from './constants.ts'
 import { codexCredentialStore, isolatedAuthContext } from './credential-store.ts'
 import { codexBaselineModels, fetchCodexModels, mergeCatalog } from './discovery.ts'
+
+// This public helper embeds the Node-compatible OAuth implementations in bundled
+// output. Without it, pi-ai's opaque lazy import points at an unpackaged file.
+// It only configures this plugin's bundled pi-ai copy, not DSH's own provider.
+registerBunOAuthFlows()
 
 /** Bound one catalog discovery so a hanging endpoint cannot hold the login check open. */
 const DISCOVERY_TIMEOUT_MS = 15_000

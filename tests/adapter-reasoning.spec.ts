@@ -3,7 +3,7 @@ import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import type { AssistantMessageEvent } from '@earendil-works/pi-ai'
 import type { Context } from '@deepseek-ai/cordis'
-import { buildModelCatalog } from '@deepseek-ai/dsh-api-session-controller'
+import { SessionController } from '@deepseek-ai/dsh-api-session-controller'
 import { CodexSubscriptionAdapter } from '../src/adapter.ts'
 import type { CodexSubscriptionController } from '../src/controller.ts'
 
@@ -49,12 +49,16 @@ describe('Codex reasoning effort', () => {
 
   it('surfaces efforts in the target DSH model picker catalog', async () => {
     const { adapter } = fixture()
-    const ctx = { llm: {
+    const defaultSelection = { provider: 'codex-subscription', model: 'gpt-5.6-terra', reasoningEffort: 'medium' }
+    const ctx = { agentDefaultModel: { currentSelection: () => defaultSelection }, llm: {
       listProviders: () => [adapter.providerInfo()],
       listModels: (provider: string) => adapter.listModels(provider),
       resolveModelInfo: (provider: string, model: string) => adapter.resolveModel(provider, model),
     } } as unknown as Context
-    const catalog = await buildModelCatalog(ctx, { provider: 'codex-subscription', model: 'gpt-5.6-terra', reasoningEffort: 'medium' })
+    // Exercise the public controller API; its old helper export was removed in DSH 0.2.2.
+    const controller = Object.create(SessionController.prototype) as SessionController
+    Object.defineProperty(controller, 'ctx', { value: ctx })
+    const catalog = await controller.modelCatalog()
     expect(catalog.groups[0]?.name).toBe('OpenAI')
     const reasoning = catalog.groups[0]?.models.find(model => model.id === 'gpt-5.6-terra')?.reasoning
     expect(reasoning?.efforts.map(effort => effort.id))
