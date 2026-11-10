@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing stable version tag (for example v0.1.4)
+        description: Existing stable version tag (for example v0.1.5)
         required: true
         type: string
 permissions:
@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - run: npm install --global npm@latest pnpm@11.7.0
+      - run: npm install --global npm@12.2.2 pnpm@11.7.0
       - name: Validate release identity
         run: |
           node --input-type=module <<'JS'
