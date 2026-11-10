@@ -1,5 +1,42 @@
 # 兼容性基线
 
+## 当前源码：多版本兼容更新（未发布）
+
+2026-11-10 核对官方 npm registry：`@deepseek-ai/dsh` 的 `latest` / `next` 均为 `0.2.2-rc.1`，发布于 2026-11-04。开发依赖固定到该版本，不使用各子包可能滞后的 `latest` 标签。对应 GitHub 标签 `dsh-v0.2.2-rc.1` 提交为 `66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`。
+
+明确的兼容目标如下，未核查版本不自动纳入 peer 范围：
+
+| DSH | 目标含义 |
+| --- | --- |
+| `0.2.2-rc.1` | 最新发布 |
+| `0.2.2-alpha.3` | 前一次发布 |
+| `0.2.1-rc.5` | 前两次发布，也是前一个版本系列 |
+| `0.2.0-rc.2` | 原插件基线，也是前两个版本系列 |
+
+所有 DSH peer 使用上述精确版本的并集，避免宽泛 semver 范围遗漏预发布版本或误接纳未知 API。最新开发环境需要 Node.js >=24.9.0；本次本地检查使用 Node.js 26.8.2、pnpm 11.7.0。旧宿主仍遵循其各自的 Node 要求。
+
+### 兼容方式
+
+- 最新 DSH 在模型选择器注入类型中新增 `resolveText`。插件自己的面板只依赖 `available`、`directory`、`load`、`select` 这组共同契约，不强制旧版提供新字段。
+- 最新 Gateway/Typert Client 导出区分 Node 与浏览器。测试显式选择浏览器 factory；插件仍使用四个目标版本共同支持的 ModuleLoader factory。
+- 最新 SessionController 不再公开 `buildModelCatalog` 辅助导出。回归测试改走公开的 `modelCatalog()` 方法。
+- DSH 的 pi-ai 从 `^0.87.1` 经 `^1.1.0` 升为 `^1.3.0`。插件不再将 `0.87.1` 强加为宿主 peer，改为拥有固定依赖并把补丁后的实现打包进 Host。OAuth 使用 pi-ai 的公共静态加载注册器，避免打包后懒加载路径缺失。声明文件仍可引用固定依赖的类型；不会替换官方提供商或读取其凭据。
+- `0.2.2-alpha.3` 依赖 Cordis `~4.0.6-alpha.2` 与 Schemastery `~3.18.6-alpha.2`。peer 范围明确包含这些预发布版本，不用 `--force` 或 `--legacy-peer-deps` 绕过检查。
+- Codex Responses 不再接收宿主通用 `temperature` 选项，避免 `Unsupported parameter: temperature`。回归测试通过实际 pi-ai 序列化器和进程内模拟响应覆盖普通/预备请求；图片 generations/edits 请求继续保持固定参数及参考图，不自动重试付费调用。此测试不等于真实账号生成验收。
+- 现有凭据键、路由、Remote namespace、独立组件开关不变。兼容测试不读真实账号、不启动或停止用户 Web 服务，也不改 `~/.dsh`。
+
+### 可重复验证
+
+运行 `pnpm typecheck`、`pnpm test`、`pnpm test:package`、`npm pack --dry-run` 和 `git diff --check`。再运行 `pnpm test:compatibility`，它只构建一次、只打包一次，在四个独立临时目录安装同一个 tarball 和对应版本的官方 DSH 运行时。
+
+每个矩阵项核对实际安装版本，通过真实 profile 解析、兼容性预检、Loader、ToolRuntime、SkillRegistry，验证订阅路由、生图工具与 Skill、紧凑面板独立开关及完整卸载；随后对安装后的同一产物运行 Host/Client/Remote 注册与撤销、模拟 UI 和 OAuth 模块加载检查。OAuth 在选择登录方式之前取消，不打开回调端口、不调用真实授权端点。
+
+这些检查使用合成凭据与模拟网络/存储，证明包安装、共同 API 与生命周期组合，不代表真实登录、令牌刷新、模型/生图请求、完整浏览器服务器或 Desktop 验收。本次为源码兼容更新，不代表 npm 新版本已发布；已发布 `0.1.3` 的记录不变。
+
+来源：[npm DSH registry](https://registry.npmjs.org/@deepseek-ai%2Fdsh)、[最新上游提交](https://github.com/deepseek-ai/deepseek-harness/tree/66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db)。
+
+## 历史：0.1.1–0.1.3 单版本基线
+
 模型接入阶段以本机 `~/deepseek-harness` 的下列版本作为唯一开发和验收基线。
 
 | 项目 | 锁定值 |
