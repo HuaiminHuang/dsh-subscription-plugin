@@ -1,5 +1,11 @@
 # 兼容性基线
 
+## 开发分支：DSH 0.2.2-rc.5
+
+2026-11-19 核对 [npm DSH registry](https://registry.npmjs.org/@deepseek-ai%2Fdsh)：`latest` / `next` 均为 `0.2.2-rc.5`，仍是预发布版本；对应 [上游 tag](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.2-rc.5)。
+
+从 `0.2.2-rc.1` 切换开发依赖后，`LlmError` 构造函数不再接受任意字符串错误码，导致控制器的 7 处调用无法编译。改用宿主的共享错误码，保留错误消息、输入校验与生命周期，不改动凭据、请求或授权流程。兼容矩阵追加 `0.2.2-rc.5` 和其前两次发布 `0.2.2-rc.4`、`0.2.2-rc.3`，保留原四个目标；未验证的 `0.2.2-rc.2` 不声明兼容。本次不改变已发布的 npm 包。
+
 ## v0.1.5：多版本兼容更新
 
 2026-11-10 核对官方 npm registry：`@deepseek-ai/dsh` 的 `latest` / `next` 均为 `0.2.2-rc.1`，发布于 2026-11-04。开发依赖固定到该版本，不使用各子包可能滞后的 `latest` 标签。对应 GitHub 标签 `dsh-v0.2.2-rc.1` 提交为 `66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`。

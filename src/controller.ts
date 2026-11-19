@@ -170,11 +170,11 @@ export class CodexSubscriptionController extends TypertRemoteService {
   @Remote
   beginLogin(method: CodexLoginMethod): CodexSubscriptionState {
     if (method !== 'browser' && method !== 'device_code') {
-      throw new LlmError('Unknown Codex sign-in method', 'INVALID_AUTHORIZATION_METHOD')
+      throw new LlmError('Unknown Codex sign-in method', 'INVALID_REQUEST')
     }
     if (this.disposed || this.signOutTask !== undefined || this.pendingRefreshes.size !== 0
       || this.loginRun !== undefined) {
-      throw new LlmError('Codex login is not ready', 'INVALID_AUTHORIZATION_METHOD')
+      throw new LlmError('Codex login is not ready', 'AUTH')
     }
     if (this.attempt !== undefined) return this.state
     const controller = new AbortController()
@@ -284,12 +284,12 @@ export class CodexSubscriptionController extends TypertRemoteService {
   async refreshModels(): Promise<CodexSubscriptionState> {
     if (this.catalogRefreshTask !== undefined) return this.catalogRefreshTask
     if (this.disposed || this.signOutTask !== undefined || this.state.status !== 'signed-in') {
-      throw new LlmError('Sign in before refreshing models', 'INVALID_AUTHORIZATION_METHOD')
+      throw new LlmError('Sign in before refreshing models', 'NO_ADAPTER')
     }
     this.discoveryDone = false
     const task = (async () => {
       await this.refreshLoginState()
-      if (!this.discoveryDone) throw new LlmError('Could not refresh models', 'MODEL_DISCOVERY_FAILED')
+      if (!this.discoveryDone) throw new LlmError('Could not refresh models', 'DISCOVERY_FAILED')
       return this.state
     })()
     this.catalogRefreshTask = task
@@ -300,7 +300,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
   @Remote
   async signOut(): Promise<CodexSubscriptionState> {
     if (this.signOutTask !== undefined) return this.signOutTask
-    if (this.disposed) throw new LlmError('Codex plugin is unloaded', 'INVALID_AUTHORIZATION_METHOD')
+    if (this.disposed) throw new LlmError('Codex plugin is unloaded', 'NO_ADAPTER')
     const task = this.finishSignOut()
     this.signOutTask = task
     try { return await task } finally { this.signOutTask = undefined }
@@ -503,7 +503,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
       case 'auth_url': return { message: 'browser', url: this.authorizationUrl(event.url) }
       case 'device_code': {
         if (typeof event.userCode !== 'string' || !/^[A-Za-z0-9-]{4,64}$/.test(event.userCode)) {
-          throw new LlmError('Invalid Codex device verification code', 'INVALID_AUTHORIZATION_NOTICE')
+          throw new LlmError('Invalid Codex device verification code', 'INVALID_RESPONSE')
         }
         return { message: 'device_code', url: this.authorizationUrl(event.verificationUri), code: event.userCode }
       }
@@ -519,7 +519,7 @@ export class CodexSubscriptionController extends TypertRemoteService {
     } catch {
       // An invalid provider URL is not an actionable login notice.
     }
-    throw new LlmError('Invalid Codex authorization page', 'INVALID_AUTHORIZATION_NOTICE')
+    throw new LlmError('Invalid Codex authorization page', 'INVALID_RESPONSE')
   }
 
   /** Wait until pi-ai closes its manual fallback after loopback completion or cancellation. */

@@ -139,7 +139,7 @@ describe('CodexSubscriptionController authorization lifecycle', () => {
       },
     })
 
-    expect(() => instance.beginLogin('invalid' as 'browser')).toThrow(/Unknown Codex sign-in method/)
+    expect(() => instance.beginLogin('invalid' as 'browser')).toThrow(expect.objectContaining({ message: 'Unknown Codex sign-in method', code: 'INVALID_REQUEST' }))
     expect(selected).toBeUndefined()
     const started = instance.beginLogin('device_code')
     expect(selected).toBe('device_code')
@@ -232,7 +232,7 @@ describe('CodexSubscriptionController authorization lifecycle', () => {
   it('rejects provider-supplied authorization links outside the OpenAI origin', () => {
     const instance = controller()
     expect(() => (instance as unknown as { authorizationUrl(value: string): string }).authorizationUrl('https://example.com/codex/device'))
-      .toThrow('Invalid Codex authorization page')
+      .toThrow(expect.objectContaining({ message: 'Invalid Codex authorization page', code: 'INVALID_RESPONSE' }))
   })
 
   it('does not delete a saved credential when its non-destructive preflight fails', async () => {
