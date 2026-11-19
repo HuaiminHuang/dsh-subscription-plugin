@@ -92,7 +92,9 @@ The source is `chatgpt.com/backend-api/wham/usage`, an undocumented, potentially
 
 This is an independent community plugin, not an official DeepSeek or OpenAI product.
 
-Version `0.1.5` targets the latest DSH `0.2.2-rc.1` and retains compatibility with `0.2.2-alpha.3`, `0.2.1-rc.5`, and `0.2.0-rc.2`, covering the previous two releases and previous two version series. It bundles its own patched pi-ai `0.87.1` without requiring the host to downgrade pi-ai. See the [compatibility baseline](docs/COMPATIBILITY_BASELINE.md) for exact targets and checks. Validation remains limited to Ubuntu / Web composition with synthetic accounts, not Desktop or real-account end-to-end acceptance.
+Published version `0.1.5` targets DSH `0.2.2-rc.1` and retains compatibility with `0.2.2-alpha.3`, `0.2.1-rc.5`, and `0.2.0-rc.2`, covering the previous two releases and previous two version series. It bundles its own patched pi-ai `0.87.1` without requiring the host to downgrade pi-ai. See the [compatibility baseline](docs/COMPATIBILITY_BASELINE.md) for exact targets and checks. Validation remains limited to Ubuntu / Web composition with synthetic accounts, not Desktop or real-account end-to-end acceptance.
+
+The current source branch adds DSH `0.2.2-rc.5`. The published npm package is unchanged.
 
 Upgrade to `0.1.5` for multi-version compatibility and the `temperature` parameter fix. Historical `0.1.3` declares only DSH `0.2.0-rc.2`.
 

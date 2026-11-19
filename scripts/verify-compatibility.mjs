@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 
 // Build once before this script. Each lane installs the exact same packed artifact,
 // never the working tree or a per-version rebuild. No user's DSH profile is read.
-const versions = ['0.2.0-rc.2', '0.2.1-rc.5', '0.2.2-alpha.3', '0.2.2-rc.1']
+const versions = ['0.2.0-rc.2', '0.2.1-rc.5', '0.2.2-alpha.3', '0.2.2-rc.1', '0.2.2-rc.5']
 const selected = process.argv.slice(2)
 for (const version of selected) assert(versions.includes(version), `Unsupported matrix target: ${version}`)
 const root = fileURLToPath(new URL('..', import.meta.url))

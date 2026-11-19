@@ -233,7 +233,7 @@ describe('Codex subscription controller model catalog', () => {
     Object.assign(instance, { discoveryFetch: fetcher })
     await checkLoginState(instance)
     const before = instance.getState().models
-    await expect(instance.refreshModels()).rejects.toThrow('Could not refresh models')
+    await expect(instance.refreshModels()).rejects.toMatchObject({ message: 'Could not refresh models', code: 'DISCOVERY_FAILED' })
     expect(instance.getState()).toMatchObject({ status: 'signed-in', models: before })
     expect((await instance.refreshModels()).models[0]?.id).toBe('recovered-live-model')
   })
